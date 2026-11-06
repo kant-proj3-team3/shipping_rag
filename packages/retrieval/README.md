@@ -2,15 +2,7 @@
 
 세 가지 검색 방식(Naive / 하이브리드 / 하이브리드+리랭킹)을 구현하고, 검색 품질(Hit@k, Recall@k)을 평가한다. 청킹과 답변 생성은 하지 않는다.
 
-> 현재 상태: **구현 중**. `create_*`는 아직 `src/retrieval/mock/`의 목업을 돌려준다. 세 방식이 모두 구현되기 전까지 목업을 유지한다.
->
-> | 단계 | 상태 |
-> |---|---|
-> | 1. 설계 결정 (아래 '주요 설계 결정') | 완료 |
-> | 2. Naive(Dense) 검색 (`dense.py`) | 구현·단위 테스트 완료. 아직 `create_retriever`에 연결하지 않았다 |
-> | 3. 하이브리드 (BM25 + RRF) | 예정 |
-> | 4. 하이브리드+리랭킹 | 예정 |
-> | 5. 실제 평가기, `create_retriever` 연결 | 예정 |
+> 현재 상태: **구현 중**. Naive(Dense) 검색(`dense.py`)까지 구현했다. 하이브리드·리랭킹과 실제 평가기는 아직 없어서 `create_*`는 `src/retrieval/mock/`의 목업을 돌려준다.
 
 ## 공개 인터페이스
 
@@ -19,7 +11,7 @@
 | `create_retriever(embedder, index)` | `Retriever` | `retrieve(RetrievalRequest, RequestContext) -> RetrievalResult` (async). 방식은 `mode`로만 바꾼다 |
 | `create_retrieval_evaluator(retriever)` | `RetrievalEvaluator` | `evaluate(items, mode, k, unit, golden_fingerprint=None) -> RetrievalReport` (async) |
 
-주입받는 것: `Embedder`, `IndexManifest`(청킹 모듈 산출물). 설정은 환경변수로 읽는다.
+주입받는 것: `Embedder`, `IndexManifest`(청킹 모듈 산출물). 설정은 환경변수(`QDRANT_URL`, 단독 개발은 `QDRANT_PATH`, 리랭킹은 `RERANKER_MODEL`·`RERANKER_MAX_TOKENS`)로 읽는다.
 
 ## 지킬 계약 (요약)
 
@@ -32,43 +24,6 @@
 
 자세한 규칙은 [`CLAUDE.md`](CLAUDE.md)와 루트 [`CONTRACTS.md`](../../CONTRACTS.md)를 본다.
 
-## 파일 구성
-
-| 파일 | 역할 |
-|---|---|
-| `src/retrieval/__init__.py` | 진입점 `create_retriever`, `create_retrieval_evaluator` (현재 목업을 돌려준다) |
-| `src/retrieval/dense.py` | `DenseRetriever`: 질문을 임베딩해 Qdrant에서 top-k를 가져오는 Naive 검색 |
-| `src/retrieval/store.py` | `create_qdrant_client()`: 환경변수로 Qdrant 클라이언트를 만든다 |
-| `src/retrieval/mock/` | 인터페이스를 만족하는 목업 (아래) |
-| `tests/test_dense.py` | `DenseRetriever` 단위 테스트 (Qdrant 메모리 모드, 자체 가짜 임베더) |
-| `tests/test_retrieval_mock.py` | 목업의 계약 준수 테스트 |
-
-## Naive 검색 동작 (`dense.py`)
-
-1. 생성 시 `embedder.embedder_id`와 `index.embedder_id`가 다르면 `IndexNotReadyError`.
-2. `retrieve`는 `embedder.embed_query`로 질문을 벡터로 바꾸고, `index.index_name` 컬렉션에서 가까운 k개를 가져온다. 임베딩과 Qdrant 호출은 동기라서 `asyncio.to_thread`로 돌린다.
-3. payload는 `Chunk.model_validate`로 복원해 `RetrievedChunk(rank, score, chunk)`로 만든다. `rank`는 1부터 연속이고, 결과가 없으면 빈 목록(정상)이다.
-4. 오류 처리: 질문이 임베더 한도를 넘는 `InvalidInputError` 같은 계약 오류는 그대로 전파하고, 그 밖의 Qdrant 오류와 payload 복원 실패는 `RetrievalError`로 감싼다. Naive가 아닌 mode는 `RetrievalError`다.
-
-## 환경변수
-
-모듈은 `.env`를 읽지 않고 환경변수만 본다(`.env`는 `app/`이 읽는다). 목록 원본은 루트 `.env.example`이다.
-
-| 변수 | 쓰임 |
-|---|---|
-| `QDRANT_URL` | Qdrant 서버 주소 (기본 `http://localhost:6333`) |
-| `QDRANT_PATH` | 서버 없이 단독 개발할 때만. 있으면 `QDRANT_URL`보다 우선하고 한 번에 한 프로세스만 쓴다 |
-| `RERANKER_MODEL`, `RERANKER_MAX_TOKENS` | 리랭킹 방식에서 쓴다 (구현 예정) |
-
-## 청킹 모듈과 맞춰야 할 전제
-
-코드가 아래를 가정한다. 다르면 청킹 담당과 맞춘다.
-
-- Qdrant 컬렉션 이름은 `manifest.index_name`이다.
-- 벡터는 이름 없는 기본 벡터이고 거리 지표는 코사인이다.
-- payload는 `Chunk` 스키마(`model_dump(mode="json")`)이고 `text`가 들어 있다.
-- `manifest.max_chunk_tokens`는 리랭커 입력 한도(512) 이하다.
-
 ## 목업 (`src/retrieval/mock/`)
 
 | 클래스 | 동작 |
@@ -80,12 +35,19 @@
 
 아래 값은 초기 결정이다. 평가(`cli eval`)로 확인한 뒤 바꾸면 이 절도 함께 고친다.
 
-### 0. 구조: `create_retriever` 하나가 세 방식을 모두 처리한다
+### 0. Naive(Dense)는 `dense.py`의 부품으로 두고, 검색기는 하나로 통합한다
 
-- `dense.py`의 `DenseRetriever`(Naive)는 부품이다. 계약상 `create_retriever`가 돌려주는 검색기 하나가 세 `mode`를 모두 처리해야 하므로, 하이브리드·리랭킹이 구현되면 그 검색기가 이 부품을 쓴다.
-- 시작 시 `manifest.max_chunk_tokens`와 리랭커 입력 한도(512) 대조는 그 상위 검색기에서 한다. 모드와 무관하게 시작 시점에 한 번 검사해 목업과 같은 동작을 유지한다.
-- Qdrant 클라이언트는 `store.create_qdrant_client()`가 환경변수(`QDRANT_URL`, 단독 개발은 `QDRANT_PATH`)로 만들고, `create_retriever`가 부른다. 모듈은 `.env`를 읽지 않는다.
-- 세 방식이 모두 구현되기 전까지 `create_retriever`는 목업을 돌려준다. Naive만 지원하는 검색기를 연결하면 세 방식을 비교하는 `cli eval`이 깨지기 때문이다.
+- **결정**
+  - `DenseRetriever`(`dense.py`)는 질문을 `embed_query`로 벡터로 바꿔 `index.index_name` 컬렉션에서 가까운 k개를 가져오고, payload를 `Chunk`로 복원해 `RetrievedChunk(rank, score, chunk)`를 만든다.
+  - 오류는 계약대로 나눈다: 임베더 id 불일치는 `IndexNotReadyError`, 질문이 임베더 한도를 넘는 `InvalidInputError`는 그대로 전파, 그 밖의 Qdrant 오류와 payload 복원 실패는 `RetrievalError`다. Naive가 아닌 mode를 받으면 `RetrievalError`다.
+  - 동기인 임베딩·Qdrant 호출은 `asyncio.to_thread`로 돌려 이벤트 루프를 막지 않는다.
+  - Qdrant 클라이언트는 `store.create_qdrant_client()`가 환경변수(`QDRANT_URL`, 단독 개발은 `QDRANT_PATH`)로 만든다. 모듈은 `.env`를 읽지 않는다.
+  - 최종 검색기는 하이브리드·리랭킹이 구현되면 `create_retriever`가 돌려주는 하나의 객체가 되고, 이 부품을 안에서 쓴다. 시작 시 `manifest.max_chunk_tokens`와 리랭커 입력 한도(512) 대조도 그 객체가 모드와 무관하게 한 번 한다.
+- **이유**
+  - 계약상 세 방식은 `mode`로만 바뀌고 같은 임베딩·저장소·k를 쓴다. 검색기를 따로 만들면 이 조건을 지키기 어렵다.
+  - 목업과 같은 오류 규칙을 지켜야 백엔드가 `InvalidInputError`를 400으로 매핑할 수 있다.
+- **전제(청킹 모듈)**: 컬렉션 이름은 `manifest.index_name`, 벡터는 이름 없는 기본 벡터, 거리 지표는 코사인이다. 다르면 청킹 담당과 맞춘다.
+- **감수할 점**: 세 방식이 모두 구현되기 전까지 `create_retriever`는 목업을 돌려준다. Naive만 지원하는 검색기를 연결하면 세 방식을 비교하는 `cli eval`이 깨지기 때문이다.
 
 ### 1. BM25는 `rank_bm25`로 검색 모듈 안에서 처리한다
 
