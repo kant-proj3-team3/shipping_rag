@@ -15,11 +15,12 @@
 
 ```
 repo/
-├─ pyproject.toml            # uv workspace 선언 (가상환경은 루트에 하나)
+├─ pyproject.toml            # uv workspace 선언 (가상환경은 루트에 하나). uv.lock 도 커밋한다
 ├─ docker-compose.yml        # qdrant, redis, api(FastAPI 앱), cli(배치, profile=tools)
 ├─ Dockerfile                # api·cli 공용 이미지
-├─ .env.example              # 환경변수 목록 (.env 는 커밋 금지)
-├─ app/                      # 조립만 한다: api.py(FastAPI), cli.py(index / eval)
+├─ .env.example              # 환경변수 목록 (.env 는 커밋 금지, compose 에서는 선택)
+├─ .gitattributes            # 줄바꿈 LF 통일
+├─ app/                      # 조립만 한다: api.py(create_app 팩토리), cli.py(index / eval), wiring.py(진입점 조립), envfile.py(.env 읽기)
 ├─ packages/
 │  ├─ common/                # 인터페이스·타입·오류·API 상수만 (구현 금지)
 │  ├─ chunking/              # 청킹 모듈
@@ -31,7 +32,7 @@ repo/
 └─ .github/                  # CODEOWNERS, PR 템플릿, workflows(pr-lint, test, contract-test, import-lint)
 ```
 
-각 모듈 폴더: `pyproject.toml`, `src/`, `mock/`(인터페이스를 만족하는 목업), `tests/`, `README.md`(목적·공개 인터페이스·주요 설계 결정).
+각 모듈 폴더: `pyproject.toml`, `src/`(구현과 `src/<모듈>/mock/` 목업: 인터페이스를 만족하는 목업), `tests/`, `README.md`(목적·공개 인터페이스·주요 설계 결정).
 
 ## 절대 규칙
 
@@ -82,10 +83,10 @@ repo/
 
 - 타입·인터페이스·오류·API 상수는 `packages/common`에 있다. 모듈 안에 같은 이름의 타입을 다시 만들지 않는다. 모듈 내부 중간 데이터는 자유다.
 - 설정(키·주소·모델명)은 **환경변수**로 읽고, 진입점 인자는 다른 모듈에서 오는 협력 객체뿐이다.
-- 실시간 경로(`retrieve`, `answer`)는 `async`, 배치 경로는 sync. 실패는 `common.errors`의 예외로만 알린다. 빈 검색 결과는 실패가 아니다.
+- 실시간 경로(`retrieve`, `answer`)와 그것을 동시에 호출하는 평가기(`evaluate`)는 `async`(CLI는 `asyncio.run`), 색인·골든 로딩 같은 배치 경로는 sync. 실패는 `common.errors`의 예외로만 알린다. 빈 검색 결과는 실패가 아니다.
 - 데이터가 모듈 사이를 지나는 길은 셋뿐이다: 청킹→검색은 Qdrant 인덱스(`Chunk` payload, `IndexManifest`), 검색→백엔드는 `Retriever.retrieve()`, 백엔드→프론트는 HTTP `QueryResponse`.
 - 인덱싱과 질의는 같은 `embedder_id`를 쓴다. 다르면 `IndexNotReadyError`다.
-- 계약 버전은 `common/version.py`의 `CONTRACT_VERSION`이다. 각 모듈은 `pyproject.toml`의 `[tool.rag-contract] version`(프론트는 `package.json`의 `ragContract`)으로 어느 버전 기준인지 선언한다. 서버는 `/health`의 `contract_version`으로 자기 버전을 알린다.
+- 계약 버전은 `common/version.py`의 `CONTRACT_VERSION`이다. 각 모듈은 `pyproject.toml`의 `[tool.rag-contract] version`(프론트는 `package.json`의 `ragContract`)으로 어느 버전 기준인지 선언한다.
 - 자세한 규칙: `CONTRACTS.md`, 시각 확인: `contracts/viewer.html`, 정합성 보증: `contracts/manifest.json`.
 
 ## 개발 환경과 명령
@@ -94,26 +95,37 @@ repo/
 - Windows·macOS·Linux를 함께 쓴다. 경로는 `pathlib`, 파일은 UTF-8·LF로 다루고, 셸에 의존하는 스크립트 대신 파이썬 스크립트를 쓴다.
 - 인프라는 Docker Compose로 띄운다. 인덱스와 세션은 named volume에 남는다(`down -v`는 데이터까지 지운다). 컬렉션 이름(`index_name`)에 개인 구분을 넣어 서로 덮어쓰지 않게 한다. Qdrant 로컬 모드(`QDRANT_PATH`)는 서버 없이 단독 개발·테스트할 때만 쓴다.
 - 앱은 시작 시 Qdrant 연결을 재시도해야 한다(`depends_on`은 준비 완료를 보장하지 않는다). 준비 여부는 `/health`의 `index_ready`로 알린다.
-- compose 안의 `api`·`cli`는 `.env`의 `localhost` 주소를 서비스 이름(`qdrant`, `redis`)으로 덮어쓴다. 호스트에서 직접 실행할 때는 `.env`의 `localhost` 주소를 쓴다.
+- compose 안의 `api`·`cli`는 `.env`의 `localhost` 주소를 서비스 이름(`qdrant`, `redis`)으로 덮어쓴다. 호스트에서 직접 실행할 때는 `.env`의 `localhost` 주소를 쓴다. `app/`이 시작할 때(api·cli) 저장소 루트의 `.env`를 읽는다(다른 경로는 `ENV_FILE`). 이미 설정된 환경변수는 덮어쓰지 않고, 값이 빈 항목은 설정하지 않는다. 모듈(`packages/*`)은 `.env`를 읽지 않고 환경변수만 본다.
 - 권장 환경변수: `QDRANT_URL`, `REDIS_URL`, `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`. 값은 `.env`(커밋 금지), 목록은 `.env.example`.
+- 브라우저(프론트 개발 서버)에서 api 를 직접 부르려면 `CORS_ALLOW_ORIGINS`(쉼표 구분, 예: `http://localhost:5173`)에 출처를 적는다. 비어 있으면 CORS 를 켜지 않는다.
+- **목업 단계(실제 구현 전)**: 모듈의 `create_*`는 `src/<모듈>/mock/`의 목업을 돌려준다. 목업 인덱서는 manifest 를 `MOCK_INDEX_DIR`(기본 `./.mock_index`)에 저장하므로, `cli index` 를 먼저 실행하고 api 를 (재)시작해야 `index_ready` 가 `true` 가 된다. 색인 없이 화면·API 만 시연하려면 `MOCK_INDEX_READY=1`. 실제 구현이 들어오면 두 변수는 쓰지 않는다.
+- **인덱스 반영은 재시작으로 한다**: api 는 시작 시 `get_manifest` 를 한 번 읽는다(없으면 `/health` 가 `index_ready=false`). 색인·재색인 뒤에는 api 를 재시작한다. 실행 중 자동 반영은 아직 없다. 같은 `index_name` 을 `--rebuild` 하면 `fingerprint` 가 바뀌므로, 캐시 키에 `fingerprint` 가 있어야 옛 답변이 나가지 않는다(`CONTRACTS.md` 백엔드 절).
+- 한글 Windows 콘솔에서 스크립트 출력이 깨지거나 인코딩 오류가 나면 `PYTHONUTF8=1` 을 설정한다.
 
 ```bash
-docker compose up -d qdrant redis                     # 뼈대 단계: 인프라만
+docker compose up -d qdrant redis                     # 인프라만 (목업 단계의 api 는 쓰지 않는다)
 docker compose up -d --build                          # 전체(api 포함, app/ 과 uv.lock 이 있어야 빌드된다)
 docker compose --profile tools run --rm cli index     # 배치 CLI 실행 (데이터는 ./data 를 읽기 전용으로 마운트)
+docker compose restart api                            # 색인(재색인 포함) 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다
 uv sync
+uv run uvicorn app.api:create_app --factory           # 호스트에서 api 실행 (팩토리 방식)
+uv run python -m app.cli index [--rebuild]            # 색인. 같은 index_name 은 --rebuild 로만 덮어쓴다
+uv run python -m app.cli eval --k 5 --unit page       # 검색 평가: 세 방식을 같은 k·unit 으로 비교 (unit 은 기본값 없음)
 uv run python scripts/build_contract_manifest.py                   # 계약 변경 시: 예시 검사 + openapi·viewer 재생성 + manifest 작성
 uv run python scripts/build_contract_manifest.py --check --against origin/dev   # CI와 같은 검사 (릴리스 PR은 --strict 추가)
 uv run python scripts/check_dataset_mapping.py --documents <합친 documents/> --evaluation <evaluation/>
+uv run python scripts/import_lint.py                               # 모듈 경계 검사 (CI import-lint)
 uv run pytest packages/<모듈>                                  # 모듈 단위 테스트
+uv run pytest app                                              # 조립(통합) 테스트
 ```
 
 - 4개로 나뉜 데이터 압축은 풀어서 `documents/`를 한 폴더(50개 PDF)로 합친다. 평가 파일은 4개가 동일하다.
 - 린트·포맷 도구: (팀이 정하면 여기에 기록한다)
+- PR 전에 `uv run pytest` 전체와 `import_lint.py`, `build_contract_manifest.py --check` 를 돌린다. CI(`test`, `import-lint`, `contract-test`, `pr-lint`)가 같은 검사를 한다.
 
 ## 에이전트 작업 규칙
 
-- **범위**: 맡은 모듈 폴더(와 그 `mock/`·`tests/`·`README.md`)만 수정한다. 다른 모듈, `common`, `contracts`, `app`을 고쳐야 하면 멈추고 사람에게 알린다. 계약 변경은 제안만 하고 임의로 고치지 않는다.
+- **범위**: 맡은 모듈 폴더(와 그 `src/<모듈>/mock/`·`tests/`·`README.md`)만 수정한다. 다른 모듈, `common`, `contracts`, `app`을 고쳐야 하면 멈추고 사람에게 알린다. 계약 변경은 제안만 하고 임의로 고치지 않는다.
 - **불확실하면 묻는다.** 계약 해석이 애매하거나 발제문·교안과 어긋나 보이면 추측으로 구현하지 말고 질문한다. 값을 지어내지 않는다 (필드, 점수, 비용, 출처 모두).
 - **목업 우선**: 다른 모듈은 목업으로 가정하고 작업한다. 자기 모듈의 목업은 인터페이스를 그대로 만족하도록 최신으로 유지한다.
 - **끝내기 전에** 해당 모듈의 테스트와 위 계약 검사 명령을 실행하고 결과를 보고한다. 실패를 숨기지 않고, 실행하지 못한 검사는 그렇다고 적는다.

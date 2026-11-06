@@ -27,4 +27,4 @@ PDF 읽기, 청킹, 임베딩, Qdrant 색인, 인덱스 신원 기록, 평가용
 
 ## 확인
 
-`mock/`에 인터페이스를 만족하는 목업을 유지한다. 완료 전 `uv run pytest packages/chunking`과 `scripts/check_dataset_mapping.py`를 실행한다.
+`src/chunking/mock/`에 인터페이스를 만족하는 목업을 유지한다. 완료 전 `uv run pytest packages/chunking`과 `scripts/check_dataset_mapping.py`를 실행한다.
