@@ -1,0 +1,6 @@
+node_modules
+dist
+coverage
+package-lock.json
+# 팀 공용 안내 문서. 포맷을 바꾸면 다른 담당자 문서와 diff 가 생긴다
+CLAUDE.md
