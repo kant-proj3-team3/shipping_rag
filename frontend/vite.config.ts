@@ -13,10 +13,12 @@ const API_TARGET = "http://127.0.0.1:8000";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // ^ 로 시작하는 키는 정규식이다. 문자열 키는 앞부분만 맞아도(/healthz · /sessions) 넘기므로 계약 경로만 넘긴다.
+    // 정규식은 쿼리 문자열까지 붙은 주소에 맞춰 보므로 끝을 (\?|$) 로 막는다
     proxy: {
-      "/health": API_TARGET,
-      "/query": API_TARGET,
-      "/session": API_TARGET,
+      "^/health(\\?|$)": API_TARGET,
+      "^/query(\\?|$)": API_TARGET,
+      "^/session/": API_TARGET,
     },
     fs: {
       // 목업이 저장소 루트의 contracts/examples/*.json 을 그대로 읽는다 (Vite 는 기본적으로 프로젝트 밖 파일을 막는다)
