@@ -1,0 +1,32 @@
+# PR 제목(Conventional Commits)·브랜치 규칙·본문 필수 항목을 검사한다.
+# 필수 체크로 지정할 때의 체크 이름은 job 의 name(pr-lint) 이다.
+name: pr-lint
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, edited, synchronize, reopened]   # 제목·본문을 고치면 다시 검사한다
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-lint:
+    name: pr-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PR 제목·브랜치·본문 검사
+        env:   # 제목·본문은 run 에 직접 끼워 넣지 않고 환경변수로 넘긴다 (스크립트 주입 방지)
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD: ${{ github.head_ref }}
+          PR_BASE: ${{ github.base_ref }}
+        run: python scripts/pr_lint.py

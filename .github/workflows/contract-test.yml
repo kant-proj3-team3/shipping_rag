@@ -1,0 +1,46 @@
+# 계약 검사: 예시 JSON, manifest(계약 해시·버전·산출물·모듈 선언), 기준 브랜치 대비 버전 변화.
+# 필수 체크로 지정할 때의 체크 이름은 contract-test 이다.
+# 필수 체크 워크플로에는 paths 필터를 쓰지 않는다 (해당 파일이 안 바뀐 PR 에서 체크가 영원히 대기 상태로 남는다).
+name: contract-test
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  contract-test:
+    name: contract-test
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: packages/common/src
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # origin/<기준 브랜치> 의 manifest 와 비교하려면 전체 기록이 필요하다
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - name: 계약 도구 설치 (버전 고정)
+        run: pip install -r scripts/requirements.txt
+      - name: CODEOWNERS 자리표시자 확인
+        run: |
+          if grep -q "REPLACE-" .github/CODEOWNERS; then
+            echo "::warning file=.github/CODEOWNERS::@REPLACE-... 자리표시자가 남아 있다. 실제 GitHub 아이디로 바꾼다 (없는 아이디는 조용히 무시된다)"
+          fi
+      - name: 예시 JSON 이 계약을 통과하는가
+        run: python scripts/check_examples.py
+      - name: manifest 검사 (기준 브랜치 대비, main 으로 가는 PR 은 --strict)
+        run: |
+          STRICT=""
+          if [ "$BASE_REF" = "main" ]; then STRICT="--strict"; fi
+          python scripts/build_contract_manifest.py --check --against "origin/$BASE_REF" $STRICT

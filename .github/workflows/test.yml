@@ -1,0 +1,46 @@
+# 모듈 단위 테스트. 필수 체크 이름은 test 이다.
+# 루트 pyproject.toml 이 없는 뼈대 단계에서는 건너뛰고(통과), 생기면 자동으로 모듈별 pytest 를 돌린다.
+name: test
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: uv workspace 확인
+        id: ws
+        run: |
+          if [ -f pyproject.toml ] && [ -f uv.lock ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::루트 pyproject.toml 또는 uv.lock 이 없어 테스트를 건너뛴다 (뼈대 단계)"
+          fi
+      - uses: astral-sh/setup-uv@v6
+        if: steps.ws.outputs.ready == 'true'
+      - name: 의존성 설치
+        if: steps.ws.outputs.ready == 'true'
+        run: uv sync --frozen
+      - name: 모듈별 테스트
+        if: steps.ws.outputs.ready == 'true'
+        run: |
+          status=0
+          for d in packages/*/; do
+            if [ -d "${d}tests" ]; then
+              echo "== ${d}"
+              uv run pytest "${d}" || status=1
+            fi
+          done
+          exit $status
