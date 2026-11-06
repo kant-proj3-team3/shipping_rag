@@ -19,28 +19,23 @@ jobs:
     name: contract-test
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: packages/common/src
       BASE_REF: ${{ github.base_ref }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # origin/<기준 브랜치> 의 manifest 와 비교하려면 전체 기록이 필요하다
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: scripts/requirements.txt
-      - name: 계약 도구 설치 (버전 고정)
-        run: pip install -r scripts/requirements.txt
+      - uses: astral-sh/setup-uv@v6
+      - name: 계약 도구 설치 (버전은 uv.lock 한 곳에서 고정)
+        run: uv sync --locked
       - name: CODEOWNERS 자리표시자 확인
         run: |
           if grep -q "REPLACE-" .github/CODEOWNERS; then
             echo "::warning file=.github/CODEOWNERS::@REPLACE-... 자리표시자가 남아 있다. 실제 GitHub 아이디로 바꾼다 (없는 아이디는 조용히 무시된다)"
           fi
       - name: 예시 JSON 이 계약을 통과하는가
-        run: python scripts/check_examples.py
+        run: uv run python scripts/check_examples.py
       - name: manifest 검사 (기준 브랜치 대비, main 으로 가는 PR 은 --strict)
         run: |
           STRICT=""
           if [ "$BASE_REF" = "main" ]; then STRICT="--strict"; fi
-          python scripts/build_contract_manifest.py --check --against "origin/$BASE_REF" $STRICT
+          uv run python scripts/build_contract_manifest.py --check --against "origin/$BASE_REF" $STRICT

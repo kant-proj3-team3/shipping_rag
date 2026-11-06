@@ -1,5 +1,5 @@
 # 모듈 단위 테스트. 필수 체크 이름은 test 이다.
-# 루트 pyproject.toml 이 없는 뼈대 단계에서는 건너뛰고(통과), 생기면 자동으로 모듈별 pytest 를 돌린다.
+# 루트 pyproject.toml·uv.lock 이 없으면 실패한다 (조용히 건너뛰고 통과하지 않는다).
 name: test
 
 on:
@@ -20,21 +20,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: uv workspace 확인
-        id: ws
         run: |
-          if [ -f pyproject.toml ] && [ -f uv.lock ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::루트 pyproject.toml 또는 uv.lock 이 없어 테스트를 건너뛴다 (뼈대 단계)"
-          fi
+          for f in pyproject.toml uv.lock; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f 이 없다. uv workspace 가 준비돼야 테스트가 돈다"
+              exit 1
+            fi
+          done
       - uses: astral-sh/setup-uv@v6
-        if: steps.ws.outputs.ready == 'true'
-      - name: 의존성 설치
-        if: steps.ws.outputs.ready == 'true'
-        run: uv sync --frozen
+      - name: 의존성 설치 (uv.lock 과 어긋나면 실패)
+        run: uv sync --locked
       - name: 모듈별 테스트
-        if: steps.ws.outputs.ready == 'true'
         run: |
           status=0
           for d in packages/*/; do
@@ -44,3 +40,5 @@ jobs:
             fi
           done
           exit $status
+      - name: app 통합 테스트 (모듈 조립)
+        run: uv run pytest app
