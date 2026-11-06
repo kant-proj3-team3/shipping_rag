@@ -8,7 +8,7 @@
 #  - 보호 규칙(ruleset)에서 "Require review from Code Owners" 를 켜야 승인이 필수가 된다.
 
 # 기본: 아래에 걸리지 않는 파일
-*                                          @scy0416
+*                                          @scy0416 @calm-sea-psy
 
 # 계약 — 모든 모듈이 의존한다
 /packages/common/                          @kangseung3120-crypto @chanyeongg3-design @scy0416 @calm-sea-psy
@@ -16,20 +16,20 @@
 /contracts/                                @scy0416 @calm-sea-psy
 
 # 검사 도구와 CI — 약해지지 않도록 계약 담당자가 본다
-/scripts/                                  @scy0416
-/.github/                                  @scy0416
-/contracts/manifest.json                   @scy0416
-/CLAUDE.md                                 @scy0416
-/CONTRACTS.md                              @scy0416
+/scripts/                                  @scy0416 @calm-sea-psy
+/.github/                                  @scy0416 @calm-sea-psy
+/contracts/manifest.json                   @scy0416 @calm-sea-psy
+/CLAUDE.md                                 @scy0416 @calm-sea-psy
+/CONTRACTS.md                              @scy0416 @calm-sea-psy
 
 # 모듈
 /packages/chunking/                        @kangseung3120-crypto
 /packages/retrieval/                       @chanyeongg3-design
-/packages/backend/                         @scy0416
-/app/                                      @scy0416
+/packages/backend/                         @scy0416 @calm-sea-psy
+/app/                                      @scy0416 @calm-sea-psy
 /frontend/                                 @calm-sea-psy
 
 # 인프라
-/docker-compose.yml                        @scy0416
-/Dockerfile                                @scy0416
-/.env.example                              @scy0416
+/docker-compose.yml                        @scy0416 @calm-sea-psy
+/Dockerfile                                @scy0416 @calm-sea-psy
+/.env.example                              @scy0416 @calm-sea-psy

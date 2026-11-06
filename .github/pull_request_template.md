@@ -20,6 +20,7 @@ CODEOWNERS 는 소유자 중 한 명의 승인만 요구하므로, 영향받는 
 ## 실행한 검사
 - [ ] `python scripts/build_contract_manifest.py --check`
 - [ ] 모듈 테스트 `pytest packages/<모듈>`
+- [ ] 조립 테스트 `pytest app` (app·계약·목업 변경 시)
 - [ ] (계약 변경 시) `python scripts/check_dataset_mapping.py`
 - [ ] (경계 확인) `python scripts/import_lint.py`
 <!-- 실행하지 못한 검사가 있으면 아래에 이유를 적는다. 검사가 필요 없는 PR이면 "해당 없음"과 이유를 쓴다. -->
