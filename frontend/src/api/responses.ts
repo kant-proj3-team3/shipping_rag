@@ -89,12 +89,11 @@ export function readSessionInfo({ status, body }: HttpResult): SessionInfo | nul
   if (status === HTTP_UNPROCESSABLE) {
     throw rejected(body);
   }
-  if (status === HTTP_NOT_FOUND) {
-    const parsed = apiErrorSchema.safeParse(body);
-    if (parsed.success && parsed.data.error_code === "session_not_found") {
-      return null;
-    }
-    throw unreachable(status, body, "대화 이력");
+  if (
+    status === HTTP_NOT_FOUND &&
+    apiErrorSchema.safeParse(body).data?.error_code === "session_not_found"
+  ) {
+    return null;
   }
   if (status !== HTTP_OK) {
     throw unreachable(status, body, "대화 이력");
