@@ -1,7 +1,7 @@
 // 대화 화면의 메시지 모델과 만들기 · 바꾸기 함수. React 를 쓰지 않는 순수 함수만 둔다.
 
 import type { RequestErrorCode } from "../api/client";
-import type { AnswerStatus, Citation, QueryResponse } from "../api/types";
+import type { AnswerStatus, Citation, QueryResponse, SessionTurn } from "../api/types";
 
 /** 답변 화면이 그리는 내용. 실시간 응답과 복원한 세션 기록을 모두 이 모양으로 바꾼다 */
 export interface Answer {
@@ -46,6 +46,25 @@ export function answerFromResponse(response: QueryResponse): Answer {
     reason: response.reason,
     citations: response.citations,
   };
+}
+
+/** 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지 */
+export function messagesFromSession(turns: SessionTurn[]): Message[] {
+  return turns.flatMap((turn): Message[] => [
+    { id: `${turn.requestId}:q`, role: "user", text: turn.question },
+    {
+      id: `${turn.requestId}:a`,
+      role: "assistant",
+      question: turn.question,
+      state: "done",
+      answer: {
+        status: turn.status,
+        answer: turn.answer,
+        reason: null,
+        citations: turn.citations,
+      },
+    },
+  ]);
 }
 
 /** 답변을 기다리는 중인 메시지가 있는지 */

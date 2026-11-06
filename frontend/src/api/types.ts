@@ -66,6 +66,9 @@ export const ERROR_HTTP_STATUS: Readonly<Partial<Record<ErrorCode, number>>> = {
 /** GET /session 이 한 번에 돌려주는 최근 turn 최대 개수 (계약 SESSION_MAX_LIMIT) */
 export const SESSION_MAX_LIMIT = 100;
 
+/** 세션 id 형식 (계약 SESSION_ID_PATTERN). 어기면 서버가 422 로 거절한다 */
+export const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
 /** GET /health (HealthResponse) */
 export interface HealthResponse {
   status: "ok";

@@ -14,6 +14,9 @@ export const HEALTH_INTERVAL_MS = 30_000;
 /** 처음 고른 검색 방식. 세 방식 중 품질 기대가 가장 높은 방식이다 */
 export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
 
+/** 대화 세션 id 를 남기는 저장소 키. 새로고침하면 이 세션의 기록을 서버에서 다시 불러온다 */
+export const SESSION_STORAGE_KEY = "shipping-rag:session:v1";
+
 /**
  * 질문 최대 글자 수. 계약(QueryRequest.question 의 maxLength)과 같다.
  * 브라우저 maxLength 는 UTF-16 단위라 이모지를 2자로 센다. 서버(Python len)보다 엄격한 쪽이라 길이 초과 422 를 받지 않는다

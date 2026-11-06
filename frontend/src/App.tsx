@@ -50,6 +50,7 @@ export function App() {
           <button
             type="button"
             onClick={handleNewChat}
+            disabled={chat.isRestoring}
             className="rounded-lg border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
           >
             새 대화
@@ -59,7 +60,12 @@ export function App() {
       </header>
       <main className="flex min-h-0 flex-1 flex-col">
         <ErrorBoundary message="대화를 표시하지 못했습니다. 새로고침해 주세요.">
-          <ChatView messages={chat.messages} onClarify={handleClarify} onPickExample={setDraft} />
+          <ChatView
+            messages={chat.messages}
+            isRestoring={chat.isRestoring}
+            onClarify={handleClarify}
+            onPickExample={setDraft}
+          />
         </ErrorBoundary>
         <Composer
           value={draft}
@@ -67,6 +73,7 @@ export function App() {
           onSend={(text) => chat.send(text, mode)}
           onStop={chat.stop}
           isBusy={chat.isBusy}
+          isDisabled={chat.isRestoring}
           inputRef={inputRef}
           placeholder={isAwaitingClarification(chat.messages) ? CLARIFY_PLACEHOLDER : undefined}
         />

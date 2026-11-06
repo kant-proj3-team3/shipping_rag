@@ -14,6 +14,8 @@ const EXAMPLES = [
 
 interface ChatViewProps {
   messages: Message[];
+  /** 저장해 둔 대화를 불러오는 중 */
+  isRestoring: boolean;
   /** 되묻기에서 "조건 보완해서 묻기"를 눌렀을 때. 원래 질문을 넘긴다 */
   onClarify: (question: string) => void;
   /** 빈 대화의 예시 질문을 눌렀을 때 */
@@ -25,13 +27,20 @@ interface EmptyStateProps {
 }
 
 /** 질문 · 답변 목록. 새 메시지가 붙으면 맨 아래로 내린다 */
-export function ChatView({ messages, onClarify, onPickExample }: ChatViewProps) {
+export function ChatView({ messages, isRestoring, onClarify, onPickExample }: ChatViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
 
+  if (isRestoring) {
+    return (
+      <p role="status" className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+        이전 대화를 불러오는 중...
+      </p>
+    );
+  }
   if (messages.length === 0) {
     return <EmptyState onPickExample={onPickExample} />;
   }
