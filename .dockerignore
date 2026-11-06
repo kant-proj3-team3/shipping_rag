@@ -10,3 +10,4 @@ frontend/
 contracts/
 scripts/
 *.zip
+.mock_index/

@@ -256,7 +256,11 @@ def main() -> None:
 
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     tpl = (ROOT / "scripts" / "viewer_template.html").read_text(encoding="utf-8")
-    out = ROOT / "contracts" / "viewer.html"
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", type=Path, help="기본값은 contracts/viewer.html (build_contract_manifest --check 가 임시 경로로 재생성해 비교한다)")
+    out = ap.parse_args().out or ROOT / "contracts" / "viewer.html"
     out.write_text(tpl.replace("/*__DATA__*/", blob), encoding="utf-8")
     print(f"wrote {out} ({out.stat().st_size // 1024} KB), types={len(data['types'])}, interfaces={len(data['interfaces'])}")
 

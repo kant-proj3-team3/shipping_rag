@@ -4,7 +4,8 @@
 - 구현은 이 파일의 Protocol만 만족하면 된다. 내부 구조·라이브러리는 자유.
 - 실패는 errors.py의 예외로 알린다. 빈 결과는 실패가 아니다.
 - 미확인 값은 None 또는 Score(state=unavailable)로 표현하고 0으로 채우지 않는다.
-- 실시간 경로(retrieve, answer)는 async, 배치 경로는 sync 이다.
+- 실시간 경로(retrieve, answer, get)와, 이를 여러 건 동시에 호출하거나 외부 LLM 을 병렬로 부르는 평가기(evaluate)는 async 이다.
+  호출자(배치 CLI)는 asyncio.run 으로 실행한다. 그 밖의 배치 경로(색인·골든 로딩)는 sync 이다.
   동기 구현은 asyncio.to_thread 로 감싸서 제공한다.
 """
 
@@ -122,10 +123,15 @@ class Retriever(Protocol):
     - 생성 시점에 인덱스 manifest 의 max_chunk_tokens 를 자신의 모델(리랭커 등) 입력 한도와 대조하고,
       안 맞으면 IndexNotReadyError 로 알린다. 조용히 잘라서 쓰지 않는다.
     - 같은 요청에서 모드 간 임베딩·저장소·k 는 같다. 정답·평가 정보를 참조하지 않는다.
+    - index 는 생성 시 주입받은 IndexManifest 그대로다. 평가기(보고서의 index_name·index_fingerprint)와
+      백엔드(캐시 키의 index_name+embedder_id)가 이 값으로 인덱스의 신원을 안다.
     """
 
     @property
     def supported_modes(self) -> Sequence[RetrievalMode]: ...
+
+    @property
+    def index(self) -> IndexManifest: ...
 
     async def retrieve(self, request: RetrievalRequest, ctx: RequestContext) -> RetrievalResult: ...
 
@@ -144,7 +150,9 @@ class RetrievalEvaluator(Protocol):
     - 검색 결과가 비어도 근거가 있는 문항은 제외하지 않고 0점으로 센다.
     - 호출 실패는 해당 문항을 unavailable 로 두고 평균에서 제외한다.
     - k 가 그룹 수보다 작으면 Recall 만점이 불가능하다. 보고서의 k 와 함께 해석한다.
-    - 보고서에 index_name · index_fingerprint(인덱스 manifest) 와 golden_fingerprint 를 남긴다.
+    - 보고서에 index_name · index_fingerprint(주입받은 retriever.index 의 값) 와 golden_fingerprint 를 남긴다.
+      golden_fingerprint 는 평가기가 골든 제공자를 모르므로 호출자가 GoldenDatasetProvider.fingerprint 값을 넘긴다
+      (안 넘기면 None).
     """
 
     async def evaluate(
@@ -153,6 +161,7 @@ class RetrievalEvaluator(Protocol):
         mode: RetrievalMode,
         k: int,
         unit: EvidenceUnit,
+        golden_fingerprint: str | None = None,
     ) -> RetrievalReport: ...
 
 

@@ -1,0 +1,25 @@
+# 모듈 경계 검사: 모듈은 common 만 import 한다. 필수 체크 이름은 import-lint 이다.
+name: import-lint
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: import-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  import-lint:
+    name: import-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 모듈 간 import 검사
+        run: python scripts/import_lint.py

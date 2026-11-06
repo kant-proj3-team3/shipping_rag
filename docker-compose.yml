@@ -1,11 +1,13 @@
 # 로컬 개발·시연용. 모든 서비스가 같은 네트워크에서 서비스 이름으로 서로를 찾는다.
 #
-#   docker compose up -d qdrant redis        # 뼈대 단계: 인프라만
+#   docker compose up -d qdrant redis        # 인프라만
 #   docker compose up -d --build             # 전체: qdrant + redis + api
 #   docker compose --profile tools run --rm cli index   # 배치 CLI(인덱싱·평가) 실행
+#   docker compose restart api               # 색인 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다 (그 전에는 /health 의 index_ready=false)
+#   (목업 단계) 색인 없이 시연하려면 api 환경에 MOCK_INDEX_READY=1
 #   docker compose down                      # 중지(데이터 볼륨은 유지) / down -v 는 데이터까지 삭제
 #
-# 전제: .env 파일(.env.example을 복사), api·cli는 루트 pyproject.toml/uv.lock 과 app/ 이 있어야 빌드된다.
+# 전제: .env 파일은 선택(.env.example을 복사해 쓴다). api·cli는 루트 pyproject.toml/uv.lock 과 app/ 이 있어야 빌드된다.
 
 name: rag-qa
 
@@ -38,17 +40,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
-    env_file: .env
+    command: ["uvicorn", "app.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - path: .env
+        required: false   # 새 클론에서 .env 가 없어도 기본값으로 뜬다 (.env.example 을 복사해 쓴다)
     environment:
       # .env 의 localhost 주소를 컨테이너 네트워크 주소로 덮어쓴다
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
       RAG_MODEL_CACHE: /models
+      MOCK_INDEX_DIR: /mock_index   # (목업 단계) cli 가 색인한 manifest 를 api 가 읽는다. api 는 시작 시 한 번 읽으므로 색인 후 재시작한다
     ports:
       - "8000:8000"
     volumes:
       - model_cache:/models   # 임베딩 모델(E5 등)을 한 번만 내려받는다
+      - mock_index:/mock_index
     depends_on:
       qdrant:
         condition: service_started   # 앱은 시작 시 Qdrant 연결을 재시도해야 한다 (/health 가 index_ready 로 준비 여부를 알린다)
@@ -68,16 +74,20 @@ services:
       context: .
       dockerfile: Dockerfile
     entrypoint: ["python", "-m", "app.cli"]
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false   # 새 클론에서 .env 가 없어도 기본값으로 뜬다 (.env.example 을 복사해 쓴다)
     environment:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
       RAG_MODEL_CACHE: /models
       DOCUMENTS_DIR: /data/documents
       EVALUATION_DIR: /data/evaluation
+      MOCK_INDEX_DIR: /mock_index
     volumes:
       - ./data:/data:ro   # 원본 PDF·평가 JSON (저장소에 커밋하지 않는다). 읽기 전용
       - model_cache:/models
+      - mock_index:/mock_index
     depends_on:
       - qdrant
       - redis
@@ -86,3 +96,4 @@ volumes:
   qdrant_data:
   redis_data:
   model_cache:
+  mock_index:   # (목업 단계) 목업 인덱서 manifest. down -v 는 이것도 지운다

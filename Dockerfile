@@ -27,8 +27,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ENV PATH="/app/.venv/bin:$PATH"
 
 # 컨테이너는 root가 아닌 사용자로 실행한다
-RUN useradd --create-home appuser && mkdir -p /models && chown -R appuser /models /app
+# /mock_index: 목업 인덱서의 manifest 저장 위치 (api·cli 가 볼륨으로 공유. 실제 Qdrant 구현에서는 쓰지 않는다)
+RUN useradd --create-home appuser && mkdir -p /models /mock_index && chown -R appuser /models /mock_index /app
 USER appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
