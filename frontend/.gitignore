@@ -31,3 +31,6 @@ dist-ssr
 *.test.ts
 *.test.tsx
 src/test/
+
+# 문서 관련 파일은 로컬에서만 쓰고 커밋하지 않는다
+doc/
