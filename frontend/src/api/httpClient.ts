@@ -30,9 +30,21 @@ export function createHttpApiClient({ baseUrl, healthTimeoutMs }: HttpApiClientO
   const root = baseUrl.replace(/\/+$/, "");
 
   async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
-    const timeout = AbortSignal.timeout(healthTimeoutMs);
-    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-    return readHealth(await send(`${root}${PATH_HEALTH}`, { signal: combined }, signal));
+    // 대기 한도와 호출자의 중지를 신호 하나로 묶는다.
+    // AbortSignal.timeout · any 는 구형 브라우저(Safari 17.4 미만 등)에 없어 직접 묶는다
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    const timer = setTimeout(abort, healthTimeoutMs);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) {
+      abort();
+    }
+    try {
+      return readHealth(await send(`${root}${PATH_HEALTH}`, { signal: controller.signal }, signal));
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    }
   }
 
   async function query(request: QueryRequest, signal?: AbortSignal): Promise<QueryResponse> {
