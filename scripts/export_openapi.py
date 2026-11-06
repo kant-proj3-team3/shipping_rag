@@ -55,6 +55,10 @@ def session(
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parents[1] / "contracts" / "openapi.json"
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", type=Path, help="기본값은 contracts/openapi.json (build_contract_manifest --check 가 임시 경로로 재생성해 비교한다)")
+    out = ap.parse_args().out or Path(__file__).resolve().parents[1] / "contracts" / "openapi.json"
     out.write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {out}")

@@ -361,6 +361,10 @@ def check(against: str | None, strict: bool) -> int:
 
 
 def main() -> int:
+    # 한글 Windows 콘솔(cp949)에서 ✓ 같은 문자를 출력해도 죽지 않게 한다 (표현 못 하는 문자는 ? 로 바꾼다)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="아무것도 쓰지 않고 검사만 한다")
     ap.add_argument("--against", metavar="GIT_REF", help="기준 브랜치와 버전 변화를 비교한다 (예: origin/dev)")
