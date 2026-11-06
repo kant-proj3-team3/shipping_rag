@@ -1,5 +1,7 @@
 // 설정값은 이 파일 한 곳에 모은다.
 
+import type { RetrievalMode } from "../api/types";
+
 /** API 주소. 비우면 같은 주소의 상대 경로(개발 중에는 Vite 프록시)로 보낸다 */
 export const API_BASE: string = import.meta.env.VITE_API_BASE ?? "";
 
@@ -8,6 +10,9 @@ export const HEALTH_TIMEOUT_MS = 5_000;
 
 /** /health 확인 주기 */
 export const HEALTH_INTERVAL_MS = 30_000;
+
+/** 처음 고른 검색 방식. 세 방식 중 품질 기대가 가장 높은 방식이다 */
+export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
 
 /**
  * 질문 최대 글자 수. 계약(QueryRequest.question 의 maxLength)과 같다.
