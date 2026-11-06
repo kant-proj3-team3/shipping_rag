@@ -66,7 +66,7 @@ export function useChat(): UseChatResult {
           setSession({ id, isRestoring: false });
         } else {
           clearSession(storage); // 없거나 만료된 세션 → 새 세션 (다음 새로고침에 다시 묻지 않게 지운다)
-          setSession({ id: crypto.randomUUID(), isRestoring: false });
+          setSession({ id: newId(), isRestoring: false });
         }
       } catch (e) {
         if (!controller.signal.aborted) {
@@ -143,7 +143,7 @@ export function useChat(): UseChatResult {
     stop();
     clearSession(storage);
     setMessages([]);
-    setSession({ id: crypto.randomUUID(), isRestoring: false });
+    setSession({ id: newId(), isRestoring: false });
   }
 
   return { messages, isRestoring: session.isRestoring, isBusy, send, stop, newChat };
@@ -159,7 +159,7 @@ function readSession(storage: KeyValueStorage): SessionState {
   } catch (e) {
     logWarning("저장해 둔 세션 id 를 읽지 못했다", e);
   }
-  return { id: crypto.randomUUID(), isRestoring: false };
+  return { id: newId(), isRestoring: false };
 }
 
 function writeSession(storage: KeyValueStorage, id: string): void {

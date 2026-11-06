@@ -33,9 +33,15 @@ export type AnswerMessage = { id: string; role: "assistant"; question: string } 
 /** 대화 안의 질문 또는 답변 하나 */
 export type Message = QuestionMessage | AnswerMessage;
 
-/** 메시지 id */
+/**
+ * 추측할 수 없는 UUID v4. 세션 id 와 메시지 id 에 쓴다.
+ * crypto.randomUUID 는 보안 컨텍스트(HTTPS · localhost)에만 있어, HTTP 주소에서도 있는 crypto.getRandomValues 로 만든다
+ */
 export function newId(): string {
-  return crypto.randomUUID();
+  const hex = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte, i) =>
+    uuidV4Byte(byte, i).toString(16).padStart(2, "0"),
+  ).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** /query 응답 → 답변 화면 내용 */
@@ -80,4 +86,15 @@ export function isAwaitingClarification(messages: Message[]): boolean {
     last.state === "done" &&
     last.answer.status === "needs_clarification"
   );
+}
+
+/** UUID v4 의 i 번째 바이트: 7번째는 버전(4), 9번째는 변형(RFC 4122) 비트를 박는다 */
+function uuidV4Byte(byte: number, i: number): number {
+  if (i === 6) {
+    return (byte & 0x0f) | 0x40;
+  }
+  if (i === 8) {
+    return (byte & 0x3f) | 0x80;
+  }
+  return byte;
 }
