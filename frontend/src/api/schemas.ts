@@ -1,5 +1,6 @@
 // 서버 형식(snake_case) 검증 · 변환. 서버 형식이 바뀌면 이 파일만 고친다.
-// 서버 형식 스키마는 계약 생성 타입(generated/openapi.d.ts)과 모양이 같아야 한다. 다르면 matching() 자리에서 타입 오류가 난다.
+// 서버 형식 스키마는 계약 생성 타입(generated/openapi.d.ts)과 모양이 같아야 하고, 화면 타입(types.ts)의 키는 계약 키를
+// camelCase 로 바꾼 것과 같아야 한다. 다르면 matching() 자리에서 타입 오류가 난다.
 // openapi.json 에 나오지 않는 계약 불변식(packages/common 의 validator)은 superRefine 으로 옮겼다.
 
 import { z } from "zod";
@@ -11,6 +12,7 @@ import {
   RETRIEVAL_MODES,
   type Citation,
   type HealthResponse,
+  type QueryMeta,
   type QueryRequest,
   type QueryResponse,
   type SessionInfo,
@@ -28,13 +30,28 @@ type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 /** 서로 대입 가능하고 키 목록도 같을 때만 true (선택 필드 하나가 빠져도 서로 대입은 되기 때문) */
 type IsSame<A, B> = Mutual<A, B> extends true ? Mutual<keyof A, keyof B> : false;
 
+/** snake_case → camelCase (화면 타입의 키를 계약 키와 맞춰 보는 데만 쓴다) */
+type CamelCase<S extends string> = S extends `${infer Head}_${infer Tail}`
+  ? `${Head}${Capitalize<CamelCase<Tail>>}`
+  : S;
+
+/** 화면 타입의 키 목록이 계약 키를 camelCase 로 바꾼 것과 같을 때만 true. 화면 타입이 없으면(undefined) 보지 않는다 */
+type ScreenKeysMatch<T, Screen> = [Screen] extends [undefined]
+  ? true
+  : Mutual<keyof Screen, CamelCase<Extract<keyof T, string>>>;
+
+/** 파싱 결과가 계약 생성 타입(T)과 같고, 화면 타입의 키도 맞을 때만 true */
+type Matches<Output, T, Screen> =
+  IsSame<Output, T> extends true ? ScreenKeysMatch<T, Screen> : false;
+
 /**
- * 서버 형식 스키마를 계약 생성 타입(T)에 묶는다.
- * 파싱 결과 타입이 T 와 다르면 이 자리에서 타입 오류가 난다 (계약이 바뀌어 openapi.d.ts 를 다시 만들면 고칠 곳이 드러난다).
+ * 서버 형식 스키마를 계약 생성 타입(T)과 화면 타입(Screen)에 묶는다.
+ * 파싱 결과 타입이 T 와 다르거나 Screen 의 키가 T 의 키와 어긋나면 이 자리에서 타입 오류가 난다
+ * (계약이 바뀌어 openapi.d.ts 를 다시 만들면 고칠 곳이 드러난다).
  */
-function matching<T>() {
+function matching<T, Screen = undefined>() {
   return <S extends z.ZodType>(
-    schema: S & (IsSame<z.output<S>, T> extends true ? unknown : never),
+    schema: S & (Matches<z.output<S>, T, Screen> extends true ? unknown : never),
   ): S => schema;
 }
 
@@ -44,7 +61,7 @@ const errorCodeSchema = z.enum(ERROR_CODES);
 // 서버(pydantic)는 UTC 시각을 Z 로, 다른 시간대는 +09:00 처럼 보낸다
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
-const citationRaw = matching<Schemas["Citation"]>()(
+const citationRaw = matching<Schemas["Citation"], Citation>()(
   z.object({
     source_id: z.string(),
     book_id: z.string(),
@@ -53,7 +70,7 @@ const citationRaw = matching<Schemas["Citation"]>()(
   }),
 );
 
-const healthRaw = matching<Schemas["HealthResponse"]>()(
+const healthRaw = matching<Schemas["HealthResponse"], HealthResponse>()(
   z.object({
     status: z.literal("ok"),
     index_ready: z.boolean(),
@@ -63,7 +80,7 @@ const healthRaw = matching<Schemas["HealthResponse"]>()(
   }),
 );
 
-const queryMetaRaw = matching<Schemas["QueryMeta"]>()(
+const queryMetaRaw = matching<Schemas["QueryMeta"], QueryMeta>()(
   z.object({
     retrieval_mode: retrievalModeSchema,
     latency_ms: z.number().nullish(),
@@ -75,7 +92,7 @@ const queryMetaRaw = matching<Schemas["QueryMeta"]>()(
   }),
 );
 
-const queryResponseRaw = matching<Schemas["QueryResponse"]>()(
+const queryResponseRaw = matching<Schemas["QueryResponse"], QueryResponse>()(
   z.object({
     request_id: z.string(),
     status: answerStatusSchema,
@@ -87,7 +104,7 @@ const queryResponseRaw = matching<Schemas["QueryResponse"]>()(
   }),
 );
 
-const sessionTurnRaw = matching<Schemas["SessionTurn"]>()(
+const sessionTurnRaw = matching<Schemas["SessionTurn"], SessionTurn>()(
   z.object({
     request_id: z.string(),
     asked_at: dateTimeSchema,
@@ -99,7 +116,7 @@ const sessionTurnRaw = matching<Schemas["SessionTurn"]>()(
   }),
 );
 
-const sessionInfoRaw = matching<Schemas["SessionInfo"]>()(
+const sessionInfoRaw = matching<Schemas["SessionInfo"], SessionInfo>()(
   z.object({
     session_id: z.string(),
     created_at: dateTimeSchema,
