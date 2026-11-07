@@ -68,25 +68,6 @@ export function answerFromResponse(response: QueryResponse): Answer {
   };
 }
 
-/** 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지 */
-export function messagesFromSession(turns: SessionTurn[]): Message[] {
-  return turns.flatMap((turn): Message[] => [
-    { id: `${turn.requestId}:q`, role: "user", text: turn.question },
-    {
-      id: `${turn.requestId}:a`,
-      role: "assistant",
-      question: turn.question,
-      state: "done",
-      answer: {
-        status: turn.status,
-        answer: turn.answer,
-        reason: null,
-        citations: turn.citations,
-      },
-    },
-  ]);
-}
-
 /**
  * 세션 기록 → 대화. 브라우저에 남은 내용이 없을 때 서버 기록으로 채운다.
  * 서버는 최근 기록만 주므로, 앞부분이 잘렸으면 제목 앞에 "…" 을 붙여 첫 질문이 아님을 알린다
@@ -147,4 +128,23 @@ function uuidV4Byte(byte: number, i: number): number {
     return (byte & 0x3f) | 0x80;
   }
   return byte;
+}
+
+// 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지
+function messagesFromSession(turns: SessionTurn[]): Message[] {
+  return turns.flatMap((turn): Message[] => [
+    { id: `${turn.requestId}:q`, role: "user", text: turn.question },
+    {
+      id: `${turn.requestId}:a`,
+      role: "assistant",
+      question: turn.question,
+      state: "done",
+      answer: {
+        status: turn.status,
+        answer: turn.answer,
+        reason: null,
+        citations: turn.citations,
+      },
+    },
+  ]);
 }

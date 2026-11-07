@@ -10,11 +10,11 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
+// 렌더 중 예외를 잡는 API 가 클래스에만 있어 클래스로 둔다. 원인은 React 가 콘솔에 남긴다
 /**
  * 렌더 중 예외를 잡아 안내와 새로고침 버튼으로 바꾼다 (빈 화면이 되지 않게).
  * 다시 시도하게 하려면 key 를 바꿔 새로 만든다.
  */
-// 렌더 중 예외를 잡는 API 가 클래스에만 있어 클래스로 둔다. 원인은 React 가 콘솔에 남긴다
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   override state: ErrorBoundaryState = { hasError: false };
 

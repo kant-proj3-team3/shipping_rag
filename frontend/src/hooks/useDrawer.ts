@@ -32,10 +32,10 @@ export function useDrawer(): UseDrawerResult {
 
   // 아래 effect 의 의존성이라 렌더마다 새로 만들지 않는다 (새로 만들면 열린 동안 포커스를 다시 옮긴다)
   const close = useCallback(() => {
-    const hadFocus = panelRef.current?.contains(document.activeElement) ?? false;
+    const hasFocus = panelRef.current?.contains(document.activeElement) ?? false;
     // 여는 버튼은 서랍이 열린 동안 inert 인 <main> 안에 있어 포커스를 받지 못한다. 먼저 닫아 inert 를 푼다
     flushSync(() => setIsOpenState(false));
-    if (hadFocus) {
+    if (hasFocus) {
       triggerRef.current?.focus();
     }
   }, []);

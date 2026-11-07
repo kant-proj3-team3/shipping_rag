@@ -148,8 +148,8 @@ export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]):
   );
   const conversations = sortByRecent([...receiving, ...merged]);
   // 목록에 없던 보고 있던 대화(서버 기록으로 채우는 중)는 건드리지 않는다
-  const wasListed = localById.has(local.currentId ?? "");
-  const isGone = wasListed && !conversations.some((c) => c.id === local.currentId);
+  const isCurrentListed = localById.has(local.currentId ?? "");
+  const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);
   return { conversations, currentId: isGone ? undefined : local.currentId };
 }
 
