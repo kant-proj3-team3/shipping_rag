@@ -1,0 +1,42 @@
+# 프론트엔드 검사: 생성 파일이 contracts/openapi.json 과 같은지, 린트 · 포맷 · 타입 검사 · 빌드.
+# 필수 체크로 지정할 때의 체크 이름은 frontend 이다.
+# 필수 체크 워크플로에는 paths 필터를 쓰지 않는다 (해당 파일이 안 바뀐 PR 에서 체크가 영원히 대기 상태로 남는다).
+name: frontend
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"   # frontend/Dockerfile 의 빌드 이미지(node:24)와 같다
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 의존성 설치 (package-lock.json 과 어긋나면 실패)
+        run: npm ci
+      - name: 생성 파일이 contracts/openapi.json 과 같은가
+        run: npm run check:api
+      - name: 린트
+        run: npm run lint
+      - name: 포맷
+        run: npm run format:check
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 빌드
+        run: npm run build

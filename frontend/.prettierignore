@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+package-lock.json
+# contracts/openapi.json 에서 생성하는 파일 (npm run gen:api). 손으로 고치지 않는다
+src/api/generated
+# 팀 공용 안내 문서. 포맷을 바꾸면 다른 담당자 문서와 diff 가 생긴다
+CLAUDE.md
