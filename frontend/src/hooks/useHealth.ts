@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { useApi } from "./useApi";
 import type { HealthResponse } from "../api/types";
 import { HEALTH_INTERVAL_MS } from "../lib/config";
+
+/** 서버 상태 질의 키 */
+const HEALTH_QUERY_KEY = ["health"] as const;
 
 /** 서버 상태 확인 결과 */
 export type HealthState =
@@ -12,48 +15,29 @@ export type HealthState =
   | { kind: "index_not_ready"; health: HealthResponse }
   | { kind: "offline" };
 
-/** /health 를 주기적으로 확인한다. 탭이 숨겨진 동안은 쉬고, 다시 보이면 바로 확인한다 */
+/**
+ * /health 를 HEALTH_INTERVAL_MS 마다 확인한다.
+ * 탭이 숨겨진 동안은 쉬고(refetchIntervalInBackground 기본값), 다시 보이면 바로 확인한다(refetchOnWindowFocus)
+ */
 export function useHealth(): HealthState {
   const api = useApi();
-  const [health, setHealth] = useState<HealthState>({ kind: "checking" });
+  const query = useQuery({
+    queryKey: HEALTH_QUERY_KEY,
+    queryFn: ({ signal }) => api.getHealth(signal),
+    refetchInterval: HEALTH_INTERVAL_MS,
+    refetchOnWindowFocus: true,
+    // 연결 실패는 바로 "연결 안 됨"으로 보인다. 다음 주기에 다시 확인한다
+    retry: false,
+    // 브라우저가 오프라인이라고 해도 요청을 멈추지 않는다 (멈추면 "서버 정상"이 그대로 남는다)
+    networkMode: "always",
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function check(): Promise<void> {
-      try {
-        const result = await api.getHealth(controller.signal);
-        setHealth({ kind: result.indexReady ? "ok" : "index_not_ready", health: result });
-      } catch {
-        if (!controller.signal.aborted) {
-          setHealth({ kind: "offline" }); // 원인은 httpClient 의 RequestError 에 있고, 화면에는 "연결 안 됨"만 보인다
-        }
-      }
-    }
-    const checkNow = (): void => void check();
-
-    function handleVisibilityChange(): void {
-      if (document.visibilityState === "visible") {
-        checkNow();
-      }
-    }
-
-    // 숨긴 탭에서는 주기 확인을 건너뛴다. 다시 보이면 visibilitychange 에서 바로 확인한다
-    function checkIfVisible(): void {
-      if (document.visibilityState !== "hidden") {
-        checkNow();
-      }
-    }
-
-    checkNow();
-    const timer = setInterval(checkIfVisible, HEALTH_INTERVAL_MS);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [api]);
-
-  return health;
+  if (query.isPending) {
+    return { kind: "checking" };
+  }
+  if (query.isError) {
+    // 원인은 httpClient 의 RequestError 에 있고, 화면에는 "연결 안 됨"만 보인다
+    return { kind: "offline" };
+  }
+  return { kind: query.data.indexReady ? "ok" : "index_not_ready", health: query.data };
 }
