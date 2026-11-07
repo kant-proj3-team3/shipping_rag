@@ -23,6 +23,7 @@ from qdrant_client import QdrantClient
 from rank_bm25 import BM25Okapi
 
 from .dense import DenseRetriever, _to_chunk
+from .reranker import CrossEncoderReranker
 
 
 # 검색 설정값
@@ -112,9 +113,13 @@ class HybridRetriever:
             embedder: Embedder,
             index: IndexManifest,
             client: QdrantClient,
+            reranker: CrossEncoderReranker | None = None,
     ) -> None:
         # Dense 검색기 초기화 및 임베딩 모델 검증
         self._dense = DenseRetriever(embedder, index, client)
+
+        self._reranker = reranker or CrossEncoderReranker()
+        self._reranker.check_chunk_limit(index.max_chunk_tokens)
 
 
         # IndexNotReadyError는 그대로, 나머지(payload 형식 오류 포함)는 모두 IndexNotReadyError로 바꾼다.
@@ -144,7 +149,7 @@ class HybridRetriever:
     @property
     def supported_modes(self) -> Sequence[RetrievalMode]:
         """지원하는 검색 방식 목록을 반환한다."""
-        return [RetrievalMode.NAIVE, RetrievalMode.HYBRID]
+        return [RetrievalMode.NAIVE, RetrievalMode.HYBRID, RetrievalMode.HYBRID_RERANK]
 
     async def retrieve(
             self,
@@ -198,15 +203,43 @@ class HybridRetriever:
         }
 
         # Dense와 BM25 순위를 RRF로 결합하고 상위 k개 선택
-        fused = rrf_fuse([dense_ids, bm25_ids])[: request.k]
+        fused = rrf_fuse([dense_ids, bm25_ids])
+
+        if request.mode is RetrievalMode.HYBRID:
+
+            # 일반 하이브리드 검색은 결합 순위에서 상위 k개 선택
+            ranked = fused[: request.k]
+
+        else:
+
+            # 리랭킹할 후보를 하이브리드 상위 CANDIDATE_POOL개로 제한
+            candidate_ids = [cid for cid, _ in fused[:CANDIDATE_POOL]]
+
+            try:
+
+                # 다른 비동기 작업을 막지 않도록 별도 스레드에서 관련성 재평가
+                rerank_scores = await asyncio.to_thread(
+                    self._reranker.score,
+                    request.query,
+                    [by_id[cid].text for cid in candidate_ids],
+                )
+            except ContractError:
+                raise   # 계약 검증 오류는 원래 유형 그대로 전달
+            except Exception as exc:
+                # 그 외 오류는 원인을 보존하며 검색 오류로 변환
+                raise RetrievalError(f"리랭킹 실패: {exc}") from exc
+
+            # 후보 ID와 점수를 연결하고, 점수 내림차순, 동점이면 ID 오름차순 정렬
+            ranked = sorted(zip(candidate_ids, rerank_scores), key=lambda t: (-t[1], t[0]))[: request.k]
 
 
+        # 선택된 청크에 1부터 순위를 부여해 공통 결과 형식으로 반환
         return RetrievalResult(
             mode=request.mode,
             k=request.k,
             chunks=[
                 RetrievedChunk(rank=i, score=s, chunk=by_id[cid])
-                for i, (cid, s) in enumerate(fused, start=1)
+                for i, (cid, s) in enumerate(ranked, start=1, )
             ],
             latency_ms=(time.perf_counter() - started) * 1000,
         )

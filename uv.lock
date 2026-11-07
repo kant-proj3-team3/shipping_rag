@@ -2001,6 +2001,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "qdrant-client" },
     { name = "rank-bm25" },
+    { name = "sentence-transformers" },
 ]
 
 [package.metadata]
@@ -2009,6 +2010,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
     { name = "qdrant-client", specifier = ">=1.10" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
+    { name = "sentence-transformers", specifier = ">=3.0" },
 ]
 
 [[package]]
