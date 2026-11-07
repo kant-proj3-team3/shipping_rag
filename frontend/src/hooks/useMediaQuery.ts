@@ -1,5 +1,13 @@
 import { useCallback, useSyncExternalStore } from "react";
 
+function hasMatchMedia(): boolean {
+  return typeof window.matchMedia === "function";
+}
+
+function noop(): void {
+  // 구독할 것이 없다
+}
+
 /**
  * CSS 미디어 쿼리가 맞는지. 바뀌면 다시 그린다.
  *
@@ -21,12 +29,4 @@ export function useMediaQuery(query: string, fallback: boolean): boolean {
   const getSnapshot = (): boolean =>
     hasMatchMedia() ? window.matchMedia(query).matches : fallback;
   return useSyncExternalStore(subscribe, getSnapshot, () => fallback);
-}
-
-function hasMatchMedia(): boolean {
-  return typeof window.matchMedia === "function";
-}
-
-function noop(): void {
-  // 구독할 것이 없다
 }

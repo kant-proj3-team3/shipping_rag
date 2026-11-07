@@ -28,33 +28,6 @@ export interface HttpApiClientOptions {
   readTimeoutMs: number;
 }
 
-/** RAG Q&A API 서버(/health · /query · /session)에 붙는 클라이언트 */
-export function createHttpApiClient({ baseUrl, readTimeoutMs }: HttpApiClientOptions): ApiClient {
-  const root = baseUrl.replace(/\/+$/, "");
-
-  async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
-    return readHealth(await read(`${root}${PATH_HEALTH}`, readTimeoutMs, signal));
-  }
-
-  async function query(request: QueryRequest, signal?: AbortSignal): Promise<QueryResponse> {
-    const init: RequestInit = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(toQueryBody(request)),
-      signal,
-    };
-    return readQueryResponse(await send(`${root}${PATH_QUERY}`, init, signal));
-  }
-
-  async function getSession(sessionId: string, signal?: AbortSignal): Promise<SessionInfo | null> {
-    const path = PATH_SESSION.replace("{session_id}", encodeURIComponent(sessionId));
-    const url = `${root}${path}?limit=${SESSION_MAX_LIMIT}`;
-    return readSessionInfo(await read(url, readTimeoutMs, signal));
-  }
-
-  return { getHealth, query, getSession };
-}
-
 /**
  * GET 요청을 대기 한도 안에서 보낸다. 대기 한도와 호출자의 중지를 신호 하나로 묶는다.
  * AbortSignal.timeout · any 는 구형 브라우저(Safari 17.4 미만 등)에 없어 직접 묶는다
@@ -110,4 +83,31 @@ function parseJson(text: string): unknown {
   } catch {
     return undefined; // JSON 이 아니다 (빈 본문 · 프록시 오류 페이지). responses.ts 가 HTTP 상태로 판단한다
   }
+}
+
+/** RAG Q&A API 서버(/health · /query · /session)에 붙는 클라이언트 */
+export function createHttpApiClient({ baseUrl, readTimeoutMs }: HttpApiClientOptions): ApiClient {
+  const root = baseUrl.replace(/\/+$/, "");
+
+  async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
+    return readHealth(await read(`${root}${PATH_HEALTH}`, readTimeoutMs, signal));
+  }
+
+  async function query(request: QueryRequest, signal?: AbortSignal): Promise<QueryResponse> {
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(toQueryBody(request)),
+      signal,
+    };
+    return readQueryResponse(await send(`${root}${PATH_QUERY}`, init, signal));
+  }
+
+  async function getSession(sessionId: string, signal?: AbortSignal): Promise<SessionInfo | null> {
+    const path = PATH_SESSION.replace("{session_id}", encodeURIComponent(sessionId));
+    const url = `${root}${path}?limit=${SESSION_MAX_LIMIT}`;
+    return readSessionInfo(await read(url, readTimeoutMs, signal));
+  }
+
+  return { getHealth, query, getSession };
 }

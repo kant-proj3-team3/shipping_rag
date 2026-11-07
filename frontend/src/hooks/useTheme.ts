@@ -13,6 +13,16 @@ export interface UseThemeResult {
   setTheme: (theme: Theme) => void;
 }
 
+function readTheme(storage: KeyValueStorage): Theme {
+  try {
+    const value = storage.getItem(THEME_STORAGE_KEY);
+    return THEMES.find((t) => t !== "system" && t === value) ?? "system";
+  } catch (e) {
+    logWarning("저장된 테마를 읽지 못했다", e);
+    return "system";
+  }
+}
+
 /**
  * 화면 테마 (시스템 · 라이트 · 다크). 고른 값은 저장소에 남긴다.
  * <html> 에 dark 클래스와 color-scheme(스크롤바 · 폼 요소 색)을 맞추고, "시스템"이면 OS 설정이 바뀌는 대로 따라간다.
@@ -44,14 +54,4 @@ export function useTheme(): UseThemeResult {
   }
 
   return { theme, setTheme: selectTheme };
-}
-
-function readTheme(storage: KeyValueStorage): Theme {
-  try {
-    const value = storage.getItem(THEME_STORAGE_KEY);
-    return THEMES.find((t) => t !== "system" && t === value) ?? "system";
-  } catch (e) {
-    logWarning("저장된 테마를 읽지 못했다", e);
-    return "system";
-  }
 }

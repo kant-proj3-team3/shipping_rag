@@ -47,6 +47,36 @@ export interface Conversation {
   messages: Message[];
 }
 
+/** UUID v4 의 i 번째 바이트: 7번째는 버전(4), 9번째는 변형(RFC 4122) 비트를 박는다 */
+function uuidV4Byte(byte: number, i: number): number {
+  if (i === 6) {
+    return (byte & 0x0f) | 0x40;
+  }
+  if (i === 8) {
+    return (byte & 0x3f) | 0x80;
+  }
+  return byte;
+}
+
+// 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지
+function messagesFromSession(turns: SessionTurn[]): Message[] {
+  return turns.flatMap((turn): Message[] => [
+    { id: `${turn.requestId}:q`, role: "user", text: turn.question },
+    {
+      id: `${turn.requestId}:a`,
+      role: "assistant",
+      question: turn.question,
+      state: "done",
+      answer: {
+        status: turn.status,
+        answer: turn.answer,
+        reason: null,
+        citations: turn.citations,
+      },
+    },
+  ]);
+}
+
 /**
  * 추측할 수 없는 UUID v4. 세션 id 와 메시지 id 에 쓴다.
  * crypto.randomUUID 는 보안 컨텍스트(HTTPS · localhost)에만 있어, HTTP 주소에서도 있는 crypto.getRandomValues 로 만든다
@@ -117,34 +147,4 @@ export function isAwaitingClarification(messages: Message[]): boolean {
     last.state === "done" &&
     last.answer.status === "needs_clarification"
   );
-}
-
-/** UUID v4 의 i 번째 바이트: 7번째는 버전(4), 9번째는 변형(RFC 4122) 비트를 박는다 */
-function uuidV4Byte(byte: number, i: number): number {
-  if (i === 6) {
-    return (byte & 0x0f) | 0x40;
-  }
-  if (i === 8) {
-    return (byte & 0x3f) | 0x80;
-  }
-  return byte;
-}
-
-// 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지
-function messagesFromSession(turns: SessionTurn[]): Message[] {
-  return turns.flatMap((turn): Message[] => [
-    { id: `${turn.requestId}:q`, role: "user", text: turn.question },
-    {
-      id: `${turn.requestId}:a`,
-      role: "assistant",
-      question: turn.question,
-      state: "done",
-      answer: {
-        status: turn.status,
-        answer: turn.answer,
-        reason: null,
-        citations: turn.citations,
-      },
-    },
-  ]);
 }

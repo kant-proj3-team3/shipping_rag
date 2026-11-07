@@ -48,6 +48,15 @@ interface SectionProps {
   children: ReactNode;
 }
 
+function Section({ title, children }: SectionProps) {
+  return (
+    <section className="space-y-1 text-sm">
+      <h3 className="text-xs font-semibold opacity-70">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 /**
  * 답변 본문: 결론 → 근거 → 출처 순서로 고정.
  * 되묻기는 파란 상자, 보류는 노란 상자로 오류(빨간 상자)와 구분한다. 근거가 없으면(세션 기록) 근거 칸을 뺀다.
@@ -85,14 +94,5 @@ export function AnswerCard({ answer, onClarify }: AnswerCardProps) {
         </button>
       ) : null}
     </div>
-  );
-}
-
-function Section({ title, children }: SectionProps) {
-  return (
-    <section className="space-y-1 text-sm">
-      <h3 className="text-xs font-semibold opacity-70">{title}</h3>
-      {children}
-    </section>
   );
 }

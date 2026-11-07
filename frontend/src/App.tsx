@@ -24,6 +24,22 @@ const CHECKING_HINT = "이전 대화를 확인하는 중입니다. 잠시 뒤 �
 /** 다른 대화가 답변을 받는 동안 입력창 아래 안내 (요청은 한 번에 하나) */
 const BUSY_ELSEWHERE_HINT = "다른 대화의 답변을 받는 중입니다. 끝나면 보낼 수 있습니다";
 
+/** 지금 보낼 수 없는 이유. 보낼 수 있으면 undefined (입력창이 키 사용법을 보여 준다) */
+function composerHintOf(isChecking: boolean, isBusyElsewhere: boolean): string | undefined {
+  if (isChecking) {
+    return CHECKING_HINT;
+  }
+  return isBusyElsewhere ? BUSY_ELSEWHERE_HINT : undefined;
+}
+
+/** 서버가 알려 준 검색 방식. 모르면(연결 안 됨 · 빈 목록) 세 방식 전부 */
+function supportedModesOf(health: HealthState): readonly RetrievalMode[] {
+  if (health.kind === "ok" || health.kind === "index_not_ready") {
+    return health.health.supportedModes.length > 0 ? health.health.supportedModes : RETRIEVAL_MODES;
+  }
+  return RETRIEVAL_MODES;
+}
+
 /** 업무 Q&A 화면: 사이드바(새 대화 · 대화 목록 · 서버 상태) + 머리줄(검색 방식 · 테마) + 대화 + 입력창 */
 export function App() {
   const health = useHealth();
@@ -152,20 +168,4 @@ export function App() {
       </main>
     </div>
   );
-}
-
-/** 지금 보낼 수 없는 이유. 보낼 수 있으면 undefined (입력창이 키 사용법을 보여 준다) */
-function composerHintOf(isChecking: boolean, isBusyElsewhere: boolean): string | undefined {
-  if (isChecking) {
-    return CHECKING_HINT;
-  }
-  return isBusyElsewhere ? BUSY_ELSEWHERE_HINT : undefined;
-}
-
-/** 서버가 알려 준 검색 방식. 모르면(연결 안 됨 · 빈 목록) 세 방식 전부 */
-function supportedModesOf(health: HealthState): readonly RetrievalMode[] {
-  if (health.kind === "ok" || health.kind === "index_not_ready") {
-    return health.health.supportedModes.length > 0 ? health.health.supportedModes : RETRIEVAL_MODES;
-  }
-  return RETRIEVAL_MODES;
 }

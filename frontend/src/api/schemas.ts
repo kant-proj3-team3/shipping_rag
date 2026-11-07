@@ -127,6 +127,22 @@ const sessionInfoRaw = matching<Schemas["SessionInfo"], SessionInfo>()(
   }),
 );
 
+function toCitation(raw: Schemas["Citation"]): Citation {
+  return { sourceId: raw.source_id, bookId: raw.book_id, fileName: raw.file_name, page: raw.page };
+}
+
+function toSessionTurn(raw: Schemas["SessionTurn"]): SessionTurn {
+  return {
+    requestId: raw.request_id,
+    askedAt: Date.parse(raw.asked_at),
+    question: raw.question,
+    retrievalMode: raw.retrieval_mode,
+    status: raw.status,
+    answer: raw.answer,
+    citations: (raw.citations ?? []).map(toCitation),
+  };
+}
+
 /** GET /health */
 export const healthSchema = healthRaw.transform((raw): HealthResponse => ({
   status: raw.status,
@@ -203,21 +219,5 @@ export function toQueryBody(request: QueryRequest): QueryBody {
     question: request.question,
     retrieval_mode: request.retrievalMode,
     session_id: request.sessionId,
-  };
-}
-
-function toCitation(raw: Schemas["Citation"]): Citation {
-  return { sourceId: raw.source_id, bookId: raw.book_id, fileName: raw.file_name, page: raw.page };
-}
-
-function toSessionTurn(raw: Schemas["SessionTurn"]): SessionTurn {
-  return {
-    requestId: raw.request_id,
-    askedAt: Date.parse(raw.asked_at),
-    question: raw.question,
-    retrievalMode: raw.retrieval_mode,
-    status: raw.status,
-    answer: raw.answer,
-    citations: (raw.citations ?? []).map(toCitation),
   };
 }

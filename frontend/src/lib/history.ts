@@ -67,6 +67,50 @@ const conversationSchema = z.object({
   messages: z.array(z.unknown()),
 });
 
+/** 저장본의 대화 하나. 깨진 메시지는 빼고, 남은 메시지가 없으면 대화를 버린다 */
+function readConversation(value: unknown): Conversation[] {
+  const parsed = conversationSchema.safeParse(value);
+  if (!parsed.success) {
+    return [];
+  }
+  const messages = parsed.data.messages.flatMap((item) => {
+    const message = messageSchema.safeParse(item);
+    return message.success ? [message.data] : [];
+  });
+  if (messages.length < parsed.data.messages.length) {
+    logWarning(
+      `대화 ${parsed.data.id} 의 깨진 메시지 ${parsed.data.messages.length - messages.length}개를 버렸다`,
+    );
+  }
+  return messages.length > 0 ? [{ ...parsed.data, messages }] : [];
+}
+
+function readList(raw: string | null): unknown[] {
+  if (raw === null) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    logWarning("대화 목록 저장본이 깨져 있어 버린다", e);
+    return [];
+  }
+  return isObject(parsed) &&
+    parsed.version === HISTORY_VERSION &&
+    Array.isArray(parsed.conversations)
+    ? parsed.conversations
+    : [];
+}
+
+function isQuotaError(e: unknown): boolean {
+  return e instanceof DOMException && QUOTA_ERROR_NAMES.includes(e.name);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 /** 저장된 대화 목록을 불러온다. 깨진 대화 · 메시지는 버리고 나머지는 살린다 */
 export function loadHistory(storage: KeyValueStorage): LoadedHistory {
   let raw: string | null;
@@ -151,48 +195,4 @@ export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]):
   const isCurrentListed = localById.has(local.currentId ?? "");
   const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);
   return { conversations, currentId: isGone ? undefined : local.currentId };
-}
-
-/** 저장본의 대화 하나. 깨진 메시지는 빼고, 남은 메시지가 없으면 대화를 버린다 */
-function readConversation(value: unknown): Conversation[] {
-  const parsed = conversationSchema.safeParse(value);
-  if (!parsed.success) {
-    return [];
-  }
-  const messages = parsed.data.messages.flatMap((item) => {
-    const message = messageSchema.safeParse(item);
-    return message.success ? [message.data] : [];
-  });
-  if (messages.length < parsed.data.messages.length) {
-    logWarning(
-      `대화 ${parsed.data.id} 의 깨진 메시지 ${parsed.data.messages.length - messages.length}개를 버렸다`,
-    );
-  }
-  return messages.length > 0 ? [{ ...parsed.data, messages }] : [];
-}
-
-function readList(raw: string | null): unknown[] {
-  if (raw === null) {
-    return [];
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    logWarning("대화 목록 저장본이 깨져 있어 버린다", e);
-    return [];
-  }
-  return isObject(parsed) &&
-    parsed.version === HISTORY_VERSION &&
-    Array.isArray(parsed.conversations)
-    ? parsed.conversations
-    : [];
-}
-
-function isQuotaError(e: unknown): boolean {
-  return e instanceof DOMException && QUOTA_ERROR_NAMES.includes(e.name);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

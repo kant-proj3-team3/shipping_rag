@@ -21,11 +21,53 @@ interface DateGroup {
   items: Conversation[];
 }
 
-/**
- * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다.
- * 대화가 수백 개일 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
- */
-export const HistoryList = memo(HistoryListView);
+function startOfDay(time: number): number {
+  const d = new Date(time);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function dateGroupLabel(time: number, today: number): string {
+  if (time >= today) {
+    return "오늘";
+  }
+  if (time >= today - DAY_MS) {
+    return "어제";
+  }
+  if (time >= today - 7 * DAY_MS) {
+    return "지난 7일";
+  }
+  return "이전";
+}
+
+/** 최신순으로 정렬된 대화를 날짜 묶음으로 (묶음 순서도 최신순) */
+function groupByDate(conversations: Conversation[], now: number): DateGroup[] {
+  const today = startOfDay(now);
+  const groups: DateGroup[] = [];
+  for (const c of conversations) {
+    const label = dateGroupLabel(c.updatedAt, today);
+    const last = groups.at(-1);
+    if (last?.label === label) {
+      last.items.push(c);
+    } else {
+      groups.push({ label, items: [c] });
+    }
+  }
+  return groups;
+}
+
+/** 오늘이면 시:분, 올해면 월.일, 그 전이면 연.월.일 */
+function timeLabel(time: number, now: number): string {
+  const d = new Date(time);
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  if (time >= startOfDay(now)) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  if (d.getFullYear() === new Date(now).getFullYear()) {
+    return `${d.getMonth() + 1}.${d.getDate()}`;
+  }
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
 
 function HistoryListView({
   conversations,
@@ -91,50 +133,8 @@ function HistoryListView({
   );
 }
 
-function startOfDay(time: number): number {
-  const d = new Date(time);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function dateGroupLabel(time: number, today: number): string {
-  if (time >= today) {
-    return "오늘";
-  }
-  if (time >= today - DAY_MS) {
-    return "어제";
-  }
-  if (time >= today - 7 * DAY_MS) {
-    return "지난 7일";
-  }
-  return "이전";
-}
-
-/** 최신순으로 정렬된 대화를 날짜 묶음으로 (묶음 순서도 최신순) */
-function groupByDate(conversations: Conversation[], now: number): DateGroup[] {
-  const today = startOfDay(now);
-  const groups: DateGroup[] = [];
-  for (const c of conversations) {
-    const label = dateGroupLabel(c.updatedAt, today);
-    const last = groups.at(-1);
-    if (last?.label === label) {
-      last.items.push(c);
-    } else {
-      groups.push({ label, items: [c] });
-    }
-  }
-  return groups;
-}
-
-/** 오늘이면 시:분, 올해면 월.일, 그 전이면 연.월.일 */
-function timeLabel(time: number, now: number): string {
-  const d = new Date(time);
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  if (time >= startOfDay(now)) {
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-  if (d.getFullYear() === new Date(now).getFullYear()) {
-    return `${d.getMonth() + 1}.${d.getDate()}`;
-  }
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
-}
+/**
+ * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다.
+ * 대화가 수백 개일 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
+ */
+export const HistoryList = memo(HistoryListView);

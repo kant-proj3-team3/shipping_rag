@@ -34,6 +34,31 @@ export interface HttpResult {
   body: unknown;
 }
 
+/** 계약이 정한 HTTP 상태. 오류 코드가 매핑에 없으면(ingest_failed 등) undefined → 계약 위반 */
+function expectedHttpStatus(response: QueryResponse): number | undefined {
+  if (response.status !== "error") {
+    return HTTP_OK;
+  }
+  return response.errorCode === null ? undefined : ERROR_HTTP_STATUS[response.errorCode];
+}
+
+/** 기대한 본문을 받지 못함: 본문이 없으면 서버에 닿지 못한 것(network), 다른 JSON 이면 계약 위반(bad_response) */
+function unreachable(status: number, body: unknown, what: string): RequestError {
+  return body === undefined
+    ? new RequestError("network", `${what}을(를) 받지 못했습니다 (HTTP ${status}, 본문 없음)`)
+    : new RequestError("bad_response", `${what} 응답이 계약과 다릅니다 (HTTP ${status})`);
+}
+
+/** 422 본문에서 거절된 필드를 찾아 오류 코드로 바꾼다 */
+function rejected(body: unknown): RequestError {
+  const parsed = validationErrorSchema.safeParse(body);
+  const fields = parsed.success ? parsed.data.detail.map((d) => String(d.loc.at(-1))) : [];
+  const code =
+    fields.map((field) => REJECTED_FIELD_CODES[field]).find((c) => c !== undefined) ??
+    "invalid_request";
+  return new RequestError(code, `요청이 검증에서 거절되었습니다 (HTTP 422: ${fields.join(", ")})`);
+}
+
 /**
  * GET /health 응답을 읽는다.
  *
@@ -105,29 +130,4 @@ export function readSessionInfo({ status, body }: HttpResult): SessionInfo | nul
     });
   }
   return parsed.data;
-}
-
-/** 계약이 정한 HTTP 상태. 오류 코드가 매핑에 없으면(ingest_failed 등) undefined → 계약 위반 */
-function expectedHttpStatus(response: QueryResponse): number | undefined {
-  if (response.status !== "error") {
-    return HTTP_OK;
-  }
-  return response.errorCode === null ? undefined : ERROR_HTTP_STATUS[response.errorCode];
-}
-
-/** 기대한 본문을 받지 못함: 본문이 없으면 서버에 닿지 못한 것(network), 다른 JSON 이면 계약 위반(bad_response) */
-function unreachable(status: number, body: unknown, what: string): RequestError {
-  return body === undefined
-    ? new RequestError("network", `${what}을(를) 받지 못했습니다 (HTTP ${status}, 본문 없음)`)
-    : new RequestError("bad_response", `${what} 응답이 계약과 다릅니다 (HTTP ${status})`);
-}
-
-/** 422 본문에서 거절된 필드를 찾아 오류 코드로 바꾼다 */
-function rejected(body: unknown): RequestError {
-  const parsed = validationErrorSchema.safeParse(body);
-  const fields = parsed.success ? parsed.data.detail.map((d) => String(d.loc.at(-1))) : [];
-  const code =
-    fields.map((field) => REJECTED_FIELD_CODES[field]).find((c) => c !== undefined) ??
-    "invalid_request";
-  return new RequestError(code, `요청이 검증에서 거절되었습니다 (HTTP 422: ${fields.join(", ")})`);
 }

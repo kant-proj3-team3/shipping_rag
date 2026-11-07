@@ -11,6 +11,17 @@ interface CitationsProps {
   citations: Citation[];
 }
 
+function uniqueByPage(citations: Citation[]): CitationItem[] {
+  const seen = new Map<string, CitationItem>();
+  for (const { fileName, page } of citations) {
+    const key = `${fileName}#${page}`;
+    if (!seen.has(key)) {
+      seen.set(key, { key, fileName, page });
+    }
+  }
+  return [...seen.values()];
+}
+
 /** 출처 목록: "IS12.pdf 9쪽" 꼴. source_id 는 요청 안에서만 유효해 보여 주지 않는다 */
 export function Citations({ citations }: CitationsProps) {
   const items = uniqueByPage(citations);
@@ -29,15 +40,4 @@ export function Citations({ citations }: CitationsProps) {
       ))}
     </ul>
   );
-}
-
-function uniqueByPage(citations: Citation[]): CitationItem[] {
-  const seen = new Map<string, CitationItem>();
-  for (const { fileName, page } of citations) {
-    const key = `${fileName}#${page}`;
-    if (!seen.has(key)) {
-      seen.set(key, { key, fileName, page });
-    }
-  }
-  return [...seen.values()];
 }
