@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { RETRIEVAL_MODES, type RetrievalMode } from "./api/types";
 import { ChatView } from "./components/ChatView";
@@ -6,7 +6,9 @@ import { Composer } from "./components/Composer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RetrievalModeSelect } from "./components/RetrievalModeSelect";
 import { Sidebar } from "./components/Sidebar";
+import { SidebarDrawer } from "./components/SidebarDrawer";
 import { useChat } from "./hooks/useChat";
+import { useDrawer } from "./hooks/useDrawer";
 import { useHealth, type HealthState } from "./hooks/useHealth";
 import { isAwaitingClarification } from "./lib/chat";
 import { DEFAULT_RETRIEVAL_MODE } from "./lib/config";
@@ -24,6 +26,14 @@ const BUSY_ELSEWHERE_HINT = "다른 대화의 답변을 받는 중입니다. 끝
 export function App() {
   const health = useHealth();
   const chat = useChat();
+  const {
+    isDrawer,
+    isOpen: isDrawerOpen,
+    open: openDrawer,
+    close: closeDrawer,
+    panelRef,
+    triggerRef,
+  } = useDrawer();
   const [draft, setDraft] = useState("");
   const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(DEFAULT_RETRIEVAL_MODE);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -43,26 +53,65 @@ export function App() {
   function handleNewChat(): void {
     chat.newChat();
     setDraft("");
-    inputRef.current?.focus();
+    if (isDrawer) {
+      closeDrawer();
+    } else {
+      inputRef.current?.focus();
+    }
   }
+
+  // memo 된 대화 목록에 넘기므로 렌더마다 새로 만들지 않는다 (입력할 때마다 목록을 다시 그리지 않게)
+  const { select } = chat;
+  const handleSelect = useCallback(
+    (id: string) => {
+      select(id);
+      if (isDrawer) {
+        closeDrawer();
+      }
+    },
+    [select, isDrawer, closeDrawer],
+  );
 
   return (
     <div className="flex h-full">
-      <Sidebar
-        health={health}
-        conversations={chat.conversations}
-        currentId={chat.currentId}
-        activeId={chat.activeId}
-        onNewChat={handleNewChat}
-        onSelect={chat.select}
-        onRemove={chat.remove}
-        lastDeleted={chat.lastDeleted}
-        onUndoRemove={chat.undoRemove}
-        isStorageOk={chat.isStorageOk}
-      />
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-          <h1 className="truncate text-sm font-semibold">해운 업무 Q&amp;A</h1>
+      <SidebarDrawer
+        isDrawer={isDrawer}
+        isOpen={isDrawerOpen}
+        onClose={closeDrawer}
+        panelRef={panelRef}
+      >
+        <Sidebar
+          health={health}
+          conversations={chat.conversations}
+          currentId={chat.currentId}
+          activeId={chat.activeId}
+          onNewChat={handleNewChat}
+          onSelect={handleSelect}
+          onRemove={chat.remove}
+          lastDeleted={chat.lastDeleted}
+          onUndoRemove={chat.undoRemove}
+          isStorageOk={chat.isStorageOk}
+        />
+      </SidebarDrawer>
+
+      {/* 서랍이 열린 동안 Tab 이 서랍 뒤로 빠지지 않게 한다 */}
+      <main className="flex min-w-0 flex-1 flex-col" inert={isDrawerOpen}>
+        <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+          {isDrawer ? (
+            <button
+              ref={triggerRef}
+              type="button"
+              onClick={openDrawer}
+              aria-label="메뉴 열기 (대화 목록 · 서버 상태)"
+              aria-expanded={isDrawerOpen}
+              aria-controls="sidebar"
+              className="-ml-1 rounded-lg px-2 py-1 text-lg leading-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              ☰
+            </button>
+          ) : null}
+          {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
+          <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <RetrievalModeSelect
               value={mode}
