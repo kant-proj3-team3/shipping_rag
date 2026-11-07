@@ -28,7 +28,7 @@ interface EmptyStateProps {
   onPickExample: (text: string) => void;
 }
 
-/** 질문 · 답변 목록. 새 메시지가 붙으면 맨 아래로 내린다 */
+/** 질문 · 답변 목록. 질문을 보내면 맨 아래로, 답이 오면 그 답의 처음(결론)이 보이게 내린다 */
 export function ChatView({
   messages,
   isChecking,
@@ -37,10 +37,19 @@ export function ChatView({
   onPickExample,
 }: ChatViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const lastRef = useRef<HTMLDivElement>(null);
+  const last = messages.at(-1);
+  const isAnswerDone = last?.role === "assistant" && last.state !== "pending";
 
+  // 답이 오면 메시지 수는 그대로라(기다리는 중 → 답) 마지막 답의 상태도 본다.
+  // 긴 답은 맨 아래로 내리면 결론이 위로 밀려나므로 답의 처음에 맞춘다 (짧으면 결국 맨 아래까지 내려간다)
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+    if (isAnswerDone) {
+      lastRef.current?.scrollIntoView({ block: "start" });
+    } else {
+      endRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [messages.length, isAnswerDone]);
 
   if (messages.length === 0 && isChecking) {
     return (
@@ -55,13 +64,15 @@ export function ChatView({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label="대화">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
-        {messages.map((m) =>
-          m.role === "user" ? (
-            <UserMessage key={m.id} message={m} />
-          ) : (
-            <AssistantMessage key={m.id} message={m} onClarify={onClarify} />
-          ),
-        )}
+        {messages.map((m) => (
+          <div key={m.id} ref={m === last ? lastRef : undefined} className="scroll-mt-6">
+            {m.role === "user" ? (
+              <UserMessage message={m} />
+            ) : (
+              <AssistantMessage message={m} onClarify={onClarify} />
+            )}
+          </div>
+        ))}
         {isExpired ? (
           <p
             role="status"
