@@ -2,7 +2,7 @@
 
 세 가지 검색 방식(Naive / 하이브리드 / 하이브리드+리랭킹)을 구현하고, 검색 품질(Hit@k, Recall@k)을 평가한다. 청킹과 답변 생성은 하지 않는다.
 
-> 현재 상태: **구현 중**. Naive(Dense) 검색(`dense.py`)까지 구현했다. 하이브리드·리랭킹과 실제 평가기는 아직 없어서 `create_*`는 `src/retrieval/mock/`의 목업을 돌려준다.
+> 현재 상태: **구현 중**. Naive(Dense, `dense.py`)와 하이브리드(BM25 + RRF, `hybrid.py`)까지 구현하고 메모리 Qdrant와 가짜 청크로 단위 테스트했다. 실제 색인 데이터로는 아직 확인하지 못했다. 리랭킹과 실제 평가기는 아직 없어서 `create_*`는 `src/retrieval/mock/`의 목업을 돌려준다.
 
 ## 공개 인터페이스
 
@@ -42,12 +42,12 @@
   - 오류는 계약대로 나눈다: 임베더 id 불일치는 `IndexNotReadyError`, 질문이 임베더 한도를 넘는 `InvalidInputError`는 그대로 전파, 그 밖의 Qdrant 오류와 payload 복원 실패는 `RetrievalError`다. Naive가 아닌 mode를 받으면 `RetrievalError`다.
   - 동기인 임베딩·Qdrant 호출은 `asyncio.to_thread`로 돌려 이벤트 루프를 막지 않는다.
   - Qdrant 클라이언트는 `store.create_qdrant_client()`가 환경변수(`QDRANT_URL`, 단독 개발은 `QDRANT_PATH`)로 만든다. 모듈은 `.env`를 읽지 않는다.
-  - 최종 검색기는 하이브리드·리랭킹이 구현되면 `create_retriever`가 돌려주는 하나의 객체가 되고, 이 부품을 안에서 쓴다. 시작 시 `manifest.max_chunk_tokens`와 리랭커 입력 한도(512) 대조도 그 객체가 모드와 무관하게 한 번 한다.
+  - 최종 검색기는 `create_retriever`가 돌려주는 하나의 객체이고, 이 부품을 안에서 쓴다. 현재 `hybrid.py`의 `HybridRetriever`가 `naive`와 `hybrid`를 처리하며, 리랭킹이 추가되면 같은 객체를 확장한다. 시작 시 `manifest.max_chunk_tokens`와 리랭커 입력 한도(512) 대조도 그 객체가 모드와 무관하게 한 번 한다.
 - **이유**
   - 계약상 세 방식은 `mode`로만 바뀌고 같은 임베딩·저장소·k를 쓴다. 검색기를 따로 만들면 이 조건을 지키기 어렵다.
   - 목업과 같은 오류 규칙을 지켜야 백엔드가 `InvalidInputError`를 400으로 매핑할 수 있다.
 - **전제(청킹 모듈)**: 컬렉션 이름은 `manifest.index_name`, 벡터는 이름 없는 기본 벡터, 거리 지표는 코사인이다. 다르면 청킹 담당과 맞춘다.
-- **감수할 점**: 세 방식이 모두 구현되기 전까지 `create_retriever`는 목업을 돌려준다. Naive만 지원하는 검색기를 연결하면 세 방식을 비교하는 `cli eval`이 깨지기 때문이다.
+- **감수할 점**: 세 방식이 모두 구현되기 전까지 `create_retriever`는 목업을 돌려준다. 리랭킹을 지원하지 않는 검색기를 연결하면 세 방식을 비교하는 `cli eval`이 깨지기 때문이다.
 
 ### 1. BM25는 `rank_bm25`로 검색 모듈 안에서 처리한다
 
@@ -56,7 +56,11 @@
   - 색인은 청킹 모듈의 일이다. Qdrant sparse vector는 청킹이 색인할 때 sparse vector까지 만들어 넣어야 해서 청킹 담당과의 협의·계약 조율이 필요하다. `rank_bm25`는 `Chunk.text`(계약 필수 필드)만 있으면 되므로 협의 없이 모듈 안에서 끝난다.
   - 규모가 작다(PDF 50개, 3,750페이지). 청크 수천~수만 개는 메모리 BM25로 충분하다.
   - 외부로 나가는 것은 `Retriever.retrieve()` 결과뿐이라, 나중에 sparse vector로 바꿔도 계약은 그대로다.
-- **감수할 점**: 재색인 후에는 api를 재시작해야 BM25가 갱신된다(CLAUDE.md의 "인덱스 반영은 재시작" 규칙과 같다).
+- **구현(`hybrid.py`)**: `HybridRetriever`가 `naive`와 `hybrid`를 처리한다. 생성할 때 `load_chunks`가 컬렉션의 청크를 읽어 BM25 인덱스를 만들고(청크가 없으면 BM25 없이 빈 결과), 컬렉션이 없거나 읽기에 실패하면 `IndexNotReadyError`다. 색인 형식에 의존하는 곳은 `load_chunks` 하나다. 토큰화는 소문자 변환 후 `\w+(-\w+)*`로 자르며, `R-0021` 같은 식별자는 한 토큰으로 둔다.
+- **감수할 점**
+  - 재색인 후에는 api를 재시작해야 BM25가 갱신된다(CLAUDE.md의 "인덱스 반영은 재시작" 규칙과 같다).
+  - 토큰화는 가장 단순한 방식이라 한국어 조사가 붙은 단어는 못 찾을 수 있다. 실제 색인으로 평가한 뒤 조정한다.
+  - 후보 수는 방식마다 50개로 고정이다. `RetrievalRequest.k`의 상한(50) 때문에 Dense 후보를 `retrieve`로 가져올 때 그 값을 넘길 수 없다.
 
 ### 2. 결합 점수는 RRF(Reciprocal Rank Fusion)를 쓴다
 
