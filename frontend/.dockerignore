@@ -1,0 +1,11 @@
+# 이미지 빌드에 쓰지 않는 것. node_modules 는 컨테이너 안에서 npm ci 로 새로 설치한다 (호스트 것은 OS 가 달라 못 쓴다)
+node_modules
+dist
+doc
+.env*
+*.tsbuildinfo
+
+# 테스트는 이미지에 넣지 않는다 (../contracts 예시를 읽어 frontend/ 만으로는 타입 검사가 안 된다)
+**/*.test.ts
+**/*.test.tsx
+src/test
