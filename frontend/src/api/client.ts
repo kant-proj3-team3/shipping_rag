@@ -9,14 +9,17 @@ import type { HealthResponse, QueryRequest, QueryResponse, SessionInfo } from ".
  * - bad_response: 응답이 계약과 다름
  * - invalid_question · invalid_retrieval_mode · invalid_session_id · invalid_request: 422 (어느 값이 거절됐는지)
  */
-export type RequestErrorCode =
-  | "aborted"
-  | "network"
-  | "bad_response"
-  | "invalid_question"
-  | "invalid_retrieval_mode"
-  | "invalid_session_id"
-  | "invalid_request";
+export const REQUEST_ERROR_CODES = [
+  "aborted",
+  "network",
+  "bad_response",
+  "invalid_question",
+  "invalid_retrieval_mode",
+  "invalid_session_id",
+  "invalid_request",
+] as const;
+/** REQUEST_ERROR_CODES 의 값 하나 */
+export type RequestErrorCode = (typeof REQUEST_ERROR_CODES)[number];
 
 /** 응답을 받지 못했거나 요청이 거절된 경우의 오류. message 는 로그용 원인이다 */
 export class RequestError extends Error {
