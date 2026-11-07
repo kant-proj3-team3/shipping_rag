@@ -139,6 +139,65 @@ export function hasServerTurn(messages: Message[]): boolean {
   );
 }
 
+/** 질문 하나를 보낼 때 쓰는 id 와 시각. 부르는 쪽이 만들어 넘겨 함수는 순수하게 둔다 */
+export interface QuestionDraft {
+  /** 대화 id (= 세션 id) */
+  conversationId: string;
+  questionId: string;
+  /** 기다리는 답변 메시지 id. 답이 오면 이 메시지를 바꾼다 */
+  answerId: string;
+  text: string;
+  /** 보낸 시각 (ms) */
+  now: number;
+}
+
+/**
+ * 대화에 질문과 기다리는 답변을 붙인 새 대화. 이어서 묻는 대화가 없으면 질문 첫 줄을 제목으로 새로 만든다.
+ *
+ * @param existing 이어서 묻는 대화. 새 대화면 undefined
+ */
+export function withQuestion(
+  existing: Conversation | undefined,
+  draft: QuestionDraft,
+): Conversation {
+  return {
+    id: draft.conversationId,
+    title: existing?.title ?? titleFrom(draft.text),
+    updatedAt: draft.now,
+    messages: [
+      ...(existing?.messages ?? []),
+      { id: draft.questionId, role: "user", text: draft.text },
+      { id: draft.answerId, role: "assistant", question: draft.text, state: "pending" },
+    ],
+  };
+}
+
+/**
+ * 한 답변의 진행 상태를 바꾼 새 대화 목록. 그 대화의 updatedAt 도 now 로 바꾼다.
+ * 다른 대화 · 메시지 객체는 그대로 둔다 (다시 그리지 않게)
+ */
+export function withAnswerState(
+  conversations: Conversation[],
+  conversationId: string,
+  answerId: string,
+  next: AnswerState,
+  now: number,
+): Conversation[] {
+  return conversations.map((c) =>
+    c.id === conversationId
+      ? {
+          ...c,
+          updatedAt: now,
+          messages: c.messages.map((m) =>
+            m.id === answerId && m.role === "assistant"
+              ? { id: m.id, role: "assistant", question: m.question, ...next }
+              : m,
+          ),
+        }
+      : c,
+  );
+}
+
 /** 마지막 답변이 되묻기(needs_clarification)인지. 입력창 안내를 바꾸는 데 쓴다 */
 export function isAwaitingClarification(messages: Message[]): boolean {
   const last = messages.at(-1);

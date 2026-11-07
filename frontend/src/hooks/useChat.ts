@@ -11,7 +11,8 @@ import type { QueryRequest, RetrievalMode } from "../api/types";
 import {
   answerFromResponse,
   newId,
-  titleFrom,
+  withAnswerState,
+  withQuestion,
   type AnswerState,
   type Conversation,
   type Message,
@@ -107,19 +108,7 @@ export function useChat(): UseChatResult {
     updateHistory(
       (h) => ({
         ...h,
-        conversations: h.conversations.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                updatedAt: Date.now(),
-                messages: c.messages.map((m) =>
-                  m.id === answerId && m.role === "assistant"
-                    ? { id: m.id, role: "assistant", question: m.question, ...next }
-                    : m,
-                ),
-              }
-            : c,
-        ),
+        conversations: withAnswerState(h.conversations, conversationId, answerId, next, Date.now()),
       }),
       true,
     );
@@ -165,16 +154,13 @@ export function useChat(): UseChatResult {
       historyRef.current.conversations.find((c) => c.id === id) ??
       (restored?.id === id ? restored : undefined);
     const answerId = newId();
-    const conversation: Conversation = {
-      id,
-      title: existing?.title ?? titleFrom(text),
-      updatedAt: Date.now(),
-      messages: [
-        ...(existing?.messages ?? []),
-        { id: newId(), role: "user", text },
-        { id: answerId, role: "assistant", question: text, state: "pending" },
-      ],
-    };
+    const conversation = withQuestion(existing, {
+      conversationId: id,
+      questionId: newId(),
+      answerId,
+      text,
+      now: Date.now(),
+    });
     // 답을 받는 도중 탭이 닫혀도 질문은 남도록 바로 저장한다
     updateHistory(
       (h) => ({
