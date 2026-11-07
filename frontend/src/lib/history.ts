@@ -1,5 +1,6 @@
 // 대화 목록 저장 (브라우저 저장소). 서버 세션 기록에는 근거 · 오류 안내가 없어, 화면이 보던 내용을 브라우저에 따로 남긴다.
-// 모든 읽기 · 쓰기는 try/catch — 저장할 수 없는 환경(시크릿 창 · 차단 · 용량 초과)에서도 화면은 동작한다.
+// 읽기 · 쓰기는 storage.ts 의 readItem · writeItem 으로 감싸 저장할 수 없는 환경(시크릿 창 · 차단)에서도 화면이 동작한다.
+// 목록 저장만 용량 초과 때 줄여서 다시 쓰려고 예외를 직접 잡는다.
 // 저장 형식은 화면 형식(lib/chat.ts) 그대로다.
 
 import { z } from "zod";
@@ -7,7 +8,7 @@ import { z } from "zod";
 import { hasPendingAnswer, type Conversation, type Message } from "./chat";
 import { CURRENT_STORAGE_KEY, HISTORY_STORAGE_KEY, MAX_CONVERSATIONS } from "./config";
 import { logWarning } from "./logger";
-import type { KeyValueStorage } from "./storage";
+import { readItem, writeItem, type KeyValueStorage } from "./storage";
 import { REQUEST_ERROR_CODES } from "../api/client";
 import { ANSWER_STATUSES, SESSION_ID_PATTERN } from "../api/types";
 
@@ -113,16 +114,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** 저장된 대화 목록을 불러온다. 깨진 대화 · 메시지는 버리고 나머지는 살린다 */
 export function loadHistory(storage: KeyValueStorage): LoadedHistory {
-  let raw: string | null;
-  let current: string | null;
-  try {
-    raw = storage.getItem(HISTORY_STORAGE_KEY);
-    current = storage.getItem(CURRENT_STORAGE_KEY);
-  } catch (e) {
-    logWarning("대화 목록을 읽지 못했다", e);
-    return { conversations: [], currentId: undefined };
-  }
-
+  const raw = readItem(storage, HISTORY_STORAGE_KEY, "대화 목록");
+  const current = readItem(storage, CURRENT_STORAGE_KEY, "보고 있던 대화");
   const list = readList(raw);
   const conversations = sortByRecent(list.flatMap(readConversation));
   if (conversations.length < list.length) {
@@ -158,15 +151,8 @@ export function saveHistory(storage: KeyValueStorage, conversations: Conversatio
 
 /** 보고 있는 대화를 남긴다 (새로고침하면 다시 연다). 없으면 새 대화 화면 */
 export function saveCurrentId(storage: KeyValueStorage, id: string | undefined): void {
-  try {
-    if (id === undefined) {
-      storage.removeItem(CURRENT_STORAGE_KEY);
-    } else {
-      storage.setItem(CURRENT_STORAGE_KEY, id);
-    }
-  } catch (e) {
-    logWarning("보고 있는 대화를 저장하지 못했다", e); // 새로고침하면 새 대화 화면으로 열릴 뿐이다
-  }
+  // 못 남겨도 새로고침하면 새 대화 화면으로 열릴 뿐이다
+  writeItem(storage, CURRENT_STORAGE_KEY, id, "보고 있는 대화");
 }
 
 /** 최신 활동순으로 정렬한 새 배열 */

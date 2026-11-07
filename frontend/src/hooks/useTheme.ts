@@ -4,8 +4,7 @@ import { useMediaQuery } from "./useMediaQuery";
 import { useStorage } from "./useStorage";
 import { THEME_STORAGE_KEY } from "../lib/config";
 import { THEMES, type Theme } from "../lib/labels";
-import { logWarning } from "../lib/logger";
-import type { KeyValueStorage } from "../lib/storage";
+import { readItem, writeItem, type KeyValueStorage } from "../lib/storage";
 
 /** useTheme 이 돌려주는 선택값과 변경 함수 */
 export interface UseThemeResult {
@@ -14,13 +13,8 @@ export interface UseThemeResult {
 }
 
 function readTheme(storage: KeyValueStorage): Theme {
-  try {
-    const value = storage.getItem(THEME_STORAGE_KEY);
-    return THEMES.find((t) => t !== "system" && t === value) ?? "system";
-  } catch (e) {
-    logWarning("저장된 테마를 읽지 못했다", e);
-    return "system";
-  }
+  const value = readItem(storage, THEME_STORAGE_KEY, "테마");
+  return THEMES.find((t) => t !== "system" && t === value) ?? "system";
 }
 
 /**
@@ -42,15 +36,8 @@ export function useTheme(): UseThemeResult {
 
   function selectTheme(next: Theme): void {
     setTheme(next);
-    try {
-      if (next === "system") {
-        storage.removeItem(THEME_STORAGE_KEY);
-      } else {
-        storage.setItem(THEME_STORAGE_KEY, next);
-      }
-    } catch (e) {
-      logWarning("테마를 저장하지 못했다", e); // 지금 화면에는 적용된다
-    }
+    // "시스템"은 저장하지 않는다 (지운다). 못 써도 지금 화면에는 적용된다
+    writeItem(storage, THEME_STORAGE_KEY, next === "system" ? undefined : next, "테마");
   }
 
   return { theme, setTheme: selectTheme };
