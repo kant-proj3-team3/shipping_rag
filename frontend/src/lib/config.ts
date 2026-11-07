@@ -20,6 +20,9 @@ export const HISTORY_STORAGE_KEY = "shipping-rag:conversations:v1";
 /** 보고 있던 대화 저장소 키. 새로고침하면 이 대화를 다시 연다 */
 export const CURRENT_STORAGE_KEY = "shipping-rag:current:v1";
 
+/** 고른 화면 테마 저장소 키. index.html 의 인라인 스크립트도 같은 키를 읽는다 */
+export const THEME_STORAGE_KEY = "shipping-rag:theme";
+
 /** 대화 보관 한도 (최신순). 대화 하나가 수 KB 라 localStorage 한도(약 5MB) 안에 넉넉하다 */
 export const MAX_CONVERSATIONS = 200;
 

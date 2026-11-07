@@ -3,6 +3,18 @@
 import type { RequestErrorCode } from "../api/client";
 import type { RetrievalMode } from "../api/types";
 
+/** 화면 테마: 시스템 설정을 따르기 · 라이트 · 다크 */
+export const THEMES = ["system", "light", "dark"] as const;
+/** THEMES 의 값 하나 */
+export type Theme = (typeof THEMES)[number];
+
+/** 화면 테마 표시 이름 */
+export const THEME_NAMES: Record<Theme, string> = {
+  system: "시스템",
+  light: "라이트",
+  dark: "다크",
+};
+
 /** 검색 방식 표시 이름 */
 export const RETRIEVAL_MODE_NAMES: Record<RetrievalMode, string> = {
   naive: "Naive",

@@ -7,9 +7,11 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RetrievalModeSelect } from "./components/RetrievalModeSelect";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarDrawer } from "./components/SidebarDrawer";
+import { ThemeSelect } from "./components/ThemeSelect";
 import { useChat } from "./hooks/useChat";
 import { useDrawer } from "./hooks/useDrawer";
 import { useHealth, type HealthState } from "./hooks/useHealth";
+import { useTheme } from "./hooks/useTheme";
 import { isAwaitingClarification } from "./lib/chat";
 import { DEFAULT_RETRIEVAL_MODE } from "./lib/config";
 
@@ -22,10 +24,11 @@ const CHECKING_HINT = "이전 대화를 확인하는 중입니다. 잠시 뒤 �
 /** 다른 대화가 답변을 받는 동안 입력창 아래 안내 (요청은 한 번에 하나) */
 const BUSY_ELSEWHERE_HINT = "다른 대화의 답변을 받는 중입니다. 끝나면 보낼 수 있습니다";
 
-/** 업무 Q&A 화면: 사이드바(새 대화 · 대화 목록 · 서버 상태) + 머리줄(검색 방식) + 대화 + 입력창 */
+/** 업무 Q&A 화면: 사이드바(새 대화 · 대화 목록 · 서버 상태) + 머리줄(검색 방식 · 테마) + 대화 + 입력창 */
 export function App() {
   const health = useHealth();
   const chat = useChat();
+  const { theme, setTheme } = useTheme();
   const {
     isDrawer,
     isOpen: isDrawerOpen,
@@ -119,6 +122,7 @@ export function App() {
               modes={modes}
               disabled={chat.isBusy}
             />
+            <ThemeSelect value={theme} onChange={setTheme} />
           </div>
         </header>
         {/* 대화 영역만 경계로 묶어 사이드바 · 입력창은 살려 둔다. 다른 대화로 옮기면 key 로 새로 그린다 */}
