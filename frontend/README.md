@@ -26,3 +26,23 @@ docker run -d --name shipping-rag-web --network rag-qa_default -p 3000:80 shippi
 ### 3. 확인
 
 <http://localhost:3000>을 열어 왼쪽 아래 서버 상태가 "서버 정상"이면 준비 완료입니다.
+
+## API 타입 다시 만들기
+
+`contracts/openapi.json`이 바뀌면 화면 코드가 쓰는 타입과 응답 검증 스키마를 다시 만듭니다. [Node.js](https://nodejs.org/)를 설치하고 `frontend` 폴더에서 실행합니다.
+
+```bash
+npm ci
+npm run gen:api
+```
+
+`openapi-typescript`가 `src/api/generated/openapi.d.ts`(서버 형식 TS 타입)를 만들고, 이어서 `scripts/gen-schemas.mjs`가 `src/api/generated/schemas.generated.ts`(zod 스키마 · 화면 타입 · 변환 함수)를 만듭니다.
+
+```bash
+npm run check:api
+npm run typecheck
+```
+
+`check:api`는 생성 파일이 지금의 `openapi.json`과 같은지만 보고, 다르면 오류로 끝납니다. `typecheck`는 화면 코드가 바뀐 타입에 맞는지 확인합니다.
+
+`gen:api`가 `gen-schemas: schema-descriptions.mjs: 없는 필드 "HealthResponse.index_ready"`처럼 멈추면 계약에서 그 필드가 빠졌거나 설명이 생긴 것이니 `scripts/schema-descriptions.mjs`에서 그 항목을 지웁니다. 그 밖의 오류는 생성 스크립트가 다루지 않는 스키마 형식이라 `scripts/gen-schemas.mjs`를 고쳐야 합니다.

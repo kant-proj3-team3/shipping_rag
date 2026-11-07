@@ -12,8 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b",
-    "gen:api": "openapi-typescript ../contracts/openapi.json -o src/api/generated/openapi.d.ts",
-    "check:api": "openapi-typescript ../contracts/openapi.json -o src/api/generated/openapi.d.ts --check",
+    "gen:api": "openapi-typescript ../contracts/openapi.json -o src/api/generated/openapi.d.ts --empty-objects-unknown && node scripts/gen-schemas.mjs",
+    "check:api": "openapi-typescript ../contracts/openapi.json -o src/api/generated/openapi.d.ts --empty-objects-unknown --check && node scripts/gen-schemas.mjs --check",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
