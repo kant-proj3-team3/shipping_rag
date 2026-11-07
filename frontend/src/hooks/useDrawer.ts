@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { flushSync } from "react-dom";
 
 import { useMediaQuery } from "./useMediaQuery";
+import { watchMedia } from "../lib/media";
 
 /** 이 너비 이상이면 사이드바가 자리를 차지하고, 미만이면 서랍(drawer)으로 연다. Tailwind md 와 같다 */
 const DESKTOP_QUERY = "(min-width: 768px)";
@@ -61,17 +62,14 @@ export function useDrawer(): UseDrawerResult {
   // 열어 둔 채 넓은 화면이 되면 닫는다. 그대로 두면 다시 좁아질 때 서랍이 저절로 열린다.
   // isOpen 은 넓어지는 순간 false 가 되어 위 effect 가 먼저 정리되므로, 연 상태(isOpenState)를 기준으로 듣는다
   useEffect(() => {
-    if (!isOpenState || typeof window.matchMedia !== "function") {
+    if (!isOpenState) {
       return undefined;
     }
-    const media = window.matchMedia(DESKTOP_QUERY);
-    function handleChange(e: MediaQueryListEvent): void {
-      if (e.matches) {
+    return watchMedia(DESKTOP_QUERY, (isDesktop) => {
+      if (isDesktop) {
         setIsOpenState(false);
       }
-    }
-    media.addEventListener("change", handleChange);
-    return () => media.removeEventListener("change", handleChange);
+    });
   }, [isOpenState]);
 
   return { isDrawer, isOpen, open, close, panelRef, triggerRef };
