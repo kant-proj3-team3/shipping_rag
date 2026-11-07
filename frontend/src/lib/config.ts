@@ -1,6 +1,6 @@
 // 설정값은 이 파일 한 곳에 모은다.
 
-import type { RetrievalMode } from "../api/types";
+import { QUERY_REQUEST_QUESTION_MAX_LENGTH, type RetrievalMode } from "../api/types";
 
 /** API 주소. 비우면 같은 주소의 상대 경로(개발 중에는 Vite 프록시)로 보낸다 */
 export const API_BASE: string = import.meta.env.VITE_API_BASE ?? "";
@@ -27,7 +27,7 @@ export const THEME_STORAGE_KEY = "shipping-rag:theme";
 export const MAX_CONVERSATIONS = 200;
 
 /**
- * 질문 최대 글자 수. 계약(QueryRequest.question 의 maxLength)과 같다.
+ * 질문 최대 글자 수. 계약(QueryRequest.question 의 maxLength)에서 생성한 값이다.
  * 브라우저 maxLength 는 UTF-16 단위라 이모지를 2자로 센다. 서버(Python len)보다 엄격한 쪽이라 길이 초과 422 를 받지 않는다
  */
-export const MAX_QUESTION_LENGTH = 500;
+export const MAX_QUESTION_LENGTH = QUERY_REQUEST_QUESTION_MAX_LENGTH;
