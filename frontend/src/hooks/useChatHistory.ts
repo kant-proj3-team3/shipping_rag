@@ -2,13 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import { useStorage } from "./useStorage";
 import { HISTORY_STORAGE_KEY } from "../lib/config";
-import {
-  loadHistory,
-  mergeFromOtherTab,
-  saveCurrentId,
-  saveHistory,
-  type LoadedHistory,
-} from "../lib/history";
+import { loadHistory, mergeFromOtherTab, saveHistory, type LoadedHistory } from "../lib/history";
 
 /** useChatHistory 가 돌려주는 목록 상태와 동작 */
 export interface UseChatHistoryResult {
@@ -27,8 +21,8 @@ export interface UseChatHistoryResult {
 }
 
 /**
- * 대화 목록을 저장소에서 불러와 들고 있고, 바꿀 때 저장한다. 보고 있는 대화도 맞춰 남긴다.
- * 다른 탭이 저장한 목록은 storage 이벤트로 받아 합친다
+ * 대화 목록을 저장소에서 불러와 들고 있고, 바꿀 때 저장한다.
+ * 다른 탭이 저장한 목록은 storage 이벤트로 받아 합친다. 보고 있는 대화는 useChat 이 남긴다
  */
 export function useChatHistory(): UseChatHistoryResult {
   const storage = useStorage();
@@ -48,10 +42,6 @@ export function useChatHistory(): UseChatHistoryResult {
     },
     [storage],
   );
-
-  useEffect(() => {
-    saveCurrentId(storage, history.currentId);
-  }, [storage, history.currentId]);
 
   // 다른 탭이 목록을 저장하면 합친다. 합치지 않으면 이 탭이 다음에 저장할 때 다른 탭의 대화를 덮어써 지운다
   useEffect(() => {
