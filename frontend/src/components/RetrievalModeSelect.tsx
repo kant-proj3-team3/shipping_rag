@@ -1,3 +1,4 @@
+import { OptionSelect } from "./OptionSelect";
 import { RETRIEVAL_MODES, type RetrievalMode } from "../api/types";
 import { RETRIEVAL_MODE_NAMES } from "../lib/labels";
 
@@ -17,23 +18,13 @@ export function RetrievalModeSelect({
   disabled = false,
 }: RetrievalModeSelectProps) {
   return (
-    <select
+    <OptionSelect
       value={value}
-      onChange={(e) => {
-        const next = modes.find((m) => m === e.target.value);
-        if (next) {
-          onChange(next);
-        }
-      }}
+      options={modes}
+      labelOf={(mode) => RETRIEVAL_MODE_NAMES[mode]}
+      onChange={onChange}
+      label="검색 방식"
       disabled={disabled}
-      aria-label="검색 방식"
-      className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
-    >
-      {modes.map((m) => (
-        <option key={m} value={m}>
-          {RETRIEVAL_MODE_NAMES[m]}
-        </option>
-      ))}
-    </select>
+    />
   );
 }
