@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Claude Code 로컬 설정
+.claude/
+
+# 테스트는 로컬에서만 쓰고 커밋하지 않는다 (테스트 파일 + 테스트 전용 도우미)
+*.test.ts
+*.test.tsx
+src/test/
+
+# 문서 관련 파일은 로컬에서만 쓰고 커밋하지 않는다 (frontend/doc/ 만. 앞의 / 가 없으면 모든 깊이의 doc 폴더가 빠진다)
+/doc/

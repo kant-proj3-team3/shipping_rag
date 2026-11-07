@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* 다크 모드는 <html class="dark"> 로 바꾼다 (시스템 · 라이트 · 다크 선택, useTheme). 처음 그리기 전에는 index.html 스크립트가 붙인다 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-white text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+}
