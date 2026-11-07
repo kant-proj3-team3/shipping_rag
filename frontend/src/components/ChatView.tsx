@@ -14,8 +14,10 @@ const EXAMPLES = [
 
 interface ChatViewProps {
   messages: Message[];
-  /** 저장해 둔 대화를 불러오는 중 */
-  isRestoring: boolean;
+  /** 대화의 서버 세션을 확인하는 중. 보여 줄 메시지가 없으면 불러오는 중으로 그린다 */
+  isChecking: boolean;
+  /** 서버에서 만료된 대화. 메시지 아래에 안내를 붙인다 */
+  isExpired: boolean;
   /** 되묻기에서 "조건 보완해서 묻기"를 눌렀을 때. 원래 질문을 넘긴다 */
   onClarify: (question: string) => void;
   /** 빈 대화의 예시 질문을 눌렀을 때 */
@@ -27,14 +29,20 @@ interface EmptyStateProps {
 }
 
 /** 질문 · 답변 목록. 새 메시지가 붙으면 맨 아래로 내린다 */
-export function ChatView({ messages, isRestoring, onClarify, onPickExample }: ChatViewProps) {
+export function ChatView({
+  messages,
+  isChecking,
+  isExpired,
+  onClarify,
+  onPickExample,
+}: ChatViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
 
-  if (isRestoring) {
+  if (messages.length === 0 && isChecking) {
     return (
       <p role="status" className="flex flex-1 items-center justify-center text-sm text-zinc-500">
         이전 대화를 불러오는 중...
@@ -54,6 +62,14 @@ export function ChatView({ messages, isRestoring, onClarify, onPickExample }: Ch
             <AssistantMessage key={m.id} message={m} onClarify={onClarify} />
           ),
         )}
+        {isExpired ? (
+          <p
+            role="status"
+            className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+          >
+            서버에서 만료된 대화입니다. 내용은 그대로 볼 수 있고, 다음 질문은 새 대화로 시작합니다.
+          </p>
+        ) : null}
         <div ref={endRef} />
       </div>
     </div>

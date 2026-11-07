@@ -1,7 +1,10 @@
-// 대화 화면의 메시지 모델과 만들기 · 바꾸기 함수. React 를 쓰지 않는 순수 함수만 둔다.
+// 대화 화면의 메시지 · 대화 모델과 만들기 · 바꾸기 함수. React 를 쓰지 않는 순수 함수만 둔다.
 
 import type { RequestErrorCode } from "../api/client";
-import type { AnswerStatus, Citation, QueryResponse, SessionTurn } from "../api/types";
+import type { AnswerStatus, Citation, QueryResponse, SessionInfo, SessionTurn } from "../api/types";
+
+/** 사이드바 제목 최대 글자 수 */
+const MAX_TITLE_LENGTH = 40;
 
 /** 답변 화면이 그리는 내용. 실시간 응답과 복원한 세션 기록을 모두 이 모양으로 바꾼다 */
 export interface Answer {
@@ -32,6 +35,17 @@ export type AnswerMessage = { id: string; role: "assistant"; question: string } 
 
 /** 대화 안의 질문 또는 답변 하나 */
 export type Message = QuestionMessage | AnswerMessage;
+
+/** 대화 하나 = 서버 세션 하나 */
+export interface Conversation {
+  /** 대화 id 이자 서버 session_id. 이 대화의 질문은 모두 이 id 로 보낸다 */
+  id: string;
+  /** 첫 질문 첫 줄 (사이드바 제목) */
+  title: string;
+  /** 마지막 활동 시각 (ms): 질문을 보낸 때 · 답이 끝난 때. 사이드바 최신순 · 날짜 묶음 기준 */
+  updatedAt: number;
+  messages: Message[];
+}
 
 /**
  * 추측할 수 없는 UUID v4. 세션 id 와 메시지 id 에 쓴다.
@@ -73,9 +87,45 @@ export function messagesFromSession(turns: SessionTurn[]): Message[] {
   ]);
 }
 
+/**
+ * 세션 기록 → 대화. 브라우저에 남은 내용이 없을 때 서버 기록으로 채운다.
+ * 서버는 최근 기록만 주므로, 앞부분이 잘렸으면 제목 앞에 "…" 을 붙여 첫 질문이 아님을 알린다
+ */
+export function conversationFromSession(info: SessionInfo): Conversation {
+  const oldest = titleFrom(info.turns[0]?.question ?? "");
+  return {
+    id: info.sessionId,
+    title: info.turnCount > info.turns.length ? `… ${oldest}` : oldest,
+    updatedAt: info.lastActiveAt,
+    messages: messagesFromSession(info.turns),
+  };
+}
+
+/** 사이드바 제목: 첫 줄, 최대 MAX_TITLE_LENGTH 자 */
+export function titleFrom(text: string): string {
+  const [line = ""] = text.trim().split("\n");
+  const chars = Array.from(line);
+  return chars.length > MAX_TITLE_LENGTH ? `${chars.slice(0, MAX_TITLE_LENGTH).join("")}…` : line;
+}
+
+/** 화면에 보이는 대화 제목. 비었으면 "제목 없음" */
+export function titleOf(conversation: Conversation): string {
+  return conversation.title || "제목 없음";
+}
+
 /** 답변을 기다리는 중인 메시지가 있는지 */
-export function isWaiting(messages: Message[]): boolean {
+export function hasPendingAnswer(messages: Message[]): boolean {
   return messages.some((m) => m.role === "assistant" && m.state === "pending");
+}
+
+/**
+ * 서버 세션에 기록이 있어야 하는 대화인지: 서버가 답한 질문이 하나라도 있으면 그렇다.
+ * status=error 응답과 응답을 받지 못한 질문은 서버에 기록되지 않는다
+ */
+export function hasServerTurn(messages: Message[]): boolean {
+  return messages.some(
+    (m) => m.role === "assistant" && m.state === "done" && m.answer.status !== "error",
+  );
 }
 
 /** 마지막 답변이 되묻기(needs_clarification)인지. 입력창 안내를 바꾸는 데 쓴다 */

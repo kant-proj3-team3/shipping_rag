@@ -22,6 +22,8 @@ interface ComposerProps {
   inputRef?: RefObject<HTMLTextAreaElement | null>;
   /** 빈 입력창 안내. 없으면 기본 문구 */
   placeholder?: string;
+  /** 입력창 아래 안내 (지금 보낼 수 없는 이유 등). 없으면 키 사용법 */
+  hint?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function Composer({
   isDisabled = false,
   inputRef,
   placeholder = "질문을 입력하세요",
+  hint = "Enter 전송 · Shift+Enter 줄바꿈",
 }: ComposerProps) {
   const countId = useId();
   const localRef = useRef<HTMLTextAreaElement>(null);
@@ -122,7 +125,7 @@ export function Composer({
         )}
       </div>
       <div className="mt-1.5 flex justify-between gap-4 px-2 text-xs text-zinc-500">
-        <span>Enter 전송 · Shift+Enter 줄바꿈</span>
+        <span>{hint}</span>
         <span id={countId} className="shrink-0 tabular-nums">
           {value.length} / {MAX_QUESTION_LENGTH}
         </span>

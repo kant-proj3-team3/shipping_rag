@@ -14,8 +14,14 @@ export const HEALTH_INTERVAL_MS = 30_000;
 /** 처음 고른 검색 방식. 세 방식 중 품질 기대가 가장 높은 방식이다 */
 export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
 
-/** 대화 세션 id 를 남기는 저장소 키. 새로고침하면 이 세션의 기록을 서버에서 다시 불러온다 */
-export const SESSION_STORAGE_KEY = "shipping-rag:session:v1";
+/** 대화 목록 저장소 키 */
+export const HISTORY_STORAGE_KEY = "shipping-rag:conversations:v1";
+
+/** 보고 있던 대화 저장소 키. 새로고침하면 이 대화를 다시 연다 */
+export const CURRENT_STORAGE_KEY = "shipping-rag:current:v1";
+
+/** 대화 보관 한도 (최신순). 대화 하나가 수 KB 라 localStorage 한도(약 5MB) 안에 넉넉하다 */
+export const MAX_CONVERSATIONS = 200;
 
 /**
  * 질문 최대 글자 수. 계약(QueryRequest.question 의 maxLength)과 같다.
