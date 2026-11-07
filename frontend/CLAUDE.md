@@ -32,4 +32,4 @@
 
 OpenAPI가 바뀌면 타입을 다시 생성하고 빌드·타입 검사를 통과시킨다. 완료 전 서버 목업 api로 화면을 확인하고, 서버 목업이 만들지 못하는 상태는 테스트로 확인한다.
 
-PR 전에 `frontend/`에서 `npm run check:api` · `lint` · `format:check` · `typecheck` · `build`를 돌린다. CI(`.github/workflows/frontend.yml`, 체크 이름 `frontend`)가 `dev`·`main`으로 가는 PR마다 같은 검사를 한다. 단위 테스트(`*.test.ts(x)`)는 저장소에 올리지 않아 CI에서 돌지 않으므로 `npm run test`는 로컬에서 돌린다.
+PR 전에 `frontend/`에서 `npm run check:api` · `lint` · `format:check` · `typecheck` · `build`를 돌린다. CI(`.github/workflows/frontend.yml`, 체크 이름 `frontend`)가 `dev`·`main`으로 가는 PR마다 같은 검사를 한다.
