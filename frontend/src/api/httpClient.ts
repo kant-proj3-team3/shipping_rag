@@ -21,30 +21,19 @@ const PATH_SESSION: keyof paths = "/session/{session_id}";
 export interface HttpApiClientOptions {
   /** API 주소. 빈 문자열이면 같은 주소의 상대 경로(개발 중에는 Vite 프록시)로 보낸다 */
   baseUrl: string;
-  /** /health 응답 대기 한도 (ms). 넘으면 network 오류 */
-  healthTimeoutMs: number;
+  /**
+   * 읽기 요청(/health · /session) 응답 대기 한도 (ms). 넘으면 network 오류.
+   * /query 에는 걸지 않는다 (답을 만드는 데 오래 걸릴 수 있고, 모델 시간 초과는 서버가 status=error 로 알린다)
+   */
+  readTimeoutMs: number;
 }
 
 /** RAG Q&A API 서버(/health · /query · /session)에 붙는 클라이언트 */
-export function createHttpApiClient({ baseUrl, healthTimeoutMs }: HttpApiClientOptions): ApiClient {
+export function createHttpApiClient({ baseUrl, readTimeoutMs }: HttpApiClientOptions): ApiClient {
   const root = baseUrl.replace(/\/+$/, "");
 
   async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
-    // 대기 한도와 호출자의 중지를 신호 하나로 묶는다.
-    // AbortSignal.timeout · any 는 구형 브라우저(Safari 17.4 미만 등)에 없어 직접 묶는다
-    const controller = new AbortController();
-    const abort = (): void => controller.abort();
-    const timer = setTimeout(abort, healthTimeoutMs);
-    signal?.addEventListener("abort", abort, { once: true });
-    if (signal?.aborted) {
-      abort();
-    }
-    try {
-      return readHealth(await send(`${root}${PATH_HEALTH}`, { signal: controller.signal }, signal));
-    } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", abort);
-    }
+    return readHealth(await read(`${root}${PATH_HEALTH}`, readTimeoutMs, signal));
   }
 
   async function query(request: QueryRequest, signal?: AbortSignal): Promise<QueryResponse> {
@@ -60,10 +49,36 @@ export function createHttpApiClient({ baseUrl, healthTimeoutMs }: HttpApiClientO
   async function getSession(sessionId: string, signal?: AbortSignal): Promise<SessionInfo | null> {
     const path = PATH_SESSION.replace("{session_id}", encodeURIComponent(sessionId));
     const url = `${root}${path}?limit=${SESSION_MAX_LIMIT}`;
-    return readSessionInfo(await send(url, { signal }, signal));
+    return readSessionInfo(await read(url, readTimeoutMs, signal));
   }
 
   return { getHealth, query, getSession };
+}
+
+/**
+ * GET 요청을 대기 한도 안에서 보낸다. 대기 한도와 호출자의 중지를 신호 하나로 묶는다.
+ * AbortSignal.timeout · any 는 구형 브라우저(Safari 17.4 미만 등)에 없어 직접 묶는다
+ *
+ * @throws RequestError 응답을 받지 못했을 때 (한도를 넘으면 network)
+ */
+async function read(
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<HttpResult> {
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  const timer = setTimeout(abort, timeoutMs);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) {
+    abort();
+  }
+  try {
+    return await send(url, { signal: controller.signal }, signal);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  }
 }
 
 /**
