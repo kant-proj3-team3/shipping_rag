@@ -12,7 +12,7 @@ export type HealthState =
   | { kind: "index_not_ready"; health: HealthResponse }
   | { kind: "offline" };
 
-/** /health 를 주기적으로 확인한다. 탭이 다시 보이면 바로 한 번 더 확인한다 */
+/** /health 를 주기적으로 확인한다. 탭이 숨겨진 동안은 쉬고, 다시 보이면 바로 확인한다 */
 export function useHealth(): HealthState {
   const api = useApi();
   const [health, setHealth] = useState<HealthState>({ kind: "checking" });
@@ -38,8 +38,15 @@ export function useHealth(): HealthState {
       }
     }
 
+    // 숨긴 탭에서는 주기 확인을 건너뛴다. 다시 보이면 visibilitychange 에서 바로 확인한다
+    function checkIfVisible(): void {
+      if (document.visibilityState !== "hidden") {
+        checkNow();
+      }
+    }
+
     checkNow();
-    const timer = setInterval(checkNow, HEALTH_INTERVAL_MS);
+    const timer = setInterval(checkIfVisible, HEALTH_INTERVAL_MS);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       controller.abort();
