@@ -1,4 +1,11 @@
-import { useId, useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type RefObject,
+} from "react";
 
 import { MAX_QUESTION_LENGTH } from "../lib/config";
 
@@ -26,6 +33,17 @@ interface ComposerProps {
   hint?: string;
 }
 
+/** 내용에 맞춰 입력창 높이를 맞춘다. MAX_HEIGHT_PX 를 넘으면 그 높이에서 입력창 안을 스크롤한다 */
+function fitHeight(ref: RefObject<HTMLTextAreaElement | null>): void {
+  const el = ref.current;
+  if (!el) {
+    return;
+  }
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
+  el.style.overflowY = el.scrollHeight > MAX_HEIGHT_PX ? "auto" : "hidden";
+}
+
 /**
  * 질문 입력: 자동 높이 · Enter 전송(한글 IME 합성 중 제외) · 전송/중지.
  * 계약 한도(MAX_QUESTION_LENGTH)를 넘는 글자는 입력되지 않는다.
@@ -49,14 +67,26 @@ export function Composer({
   const canSend = !isBusy && !isDisabled && value.trim() !== "";
 
   useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el) {
-      return;
-    }
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
-    el.style.overflowY = el.scrollHeight > MAX_HEIGHT_PX ? "auto" : "hidden";
+    fitHeight(textareaRef);
   }, [value, textareaRef]);
+
+  // 너비가 바뀌면 줄 수가 달라지므로 높이를 다시 맞춘다 (창 크기 변경 · 화면 회전 · 숨긴 창에서 열었다가 보일 때)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      // 높이를 바꿔도 이 콜백이 불리므로 너비가 바뀐 때만 맞춘다
+      if (el.clientWidth !== width) {
+        width = el.clientWidth;
+        fitHeight(textareaRef);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [textareaRef]);
 
   function submit(): void {
     if (canSend && onSend(value)) {
