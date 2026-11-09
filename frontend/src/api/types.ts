@@ -4,6 +4,7 @@
 
 import {
   QUERY_REQUEST_SESSION_ID_PATTERN,
+  SESSION_LIMIT_MAXIMUM,
   type ErrorCode,
   type QueryRequestInput,
 } from "./generated/schemas.generated";
@@ -38,8 +39,8 @@ export const ERROR_HTTP_STATUS: Readonly<Partial<Record<ErrorCode, number>>> = {
   internal: 500,
 };
 
-/** GET /session 이 한 번에 돌려주는 최근 turn 최대 개수 (계약 SESSION_MAX_LIMIT. openapi.json 에 나오지 않아 옮겨 적었다) */
-export const SESSION_MAX_LIMIT = 100;
+/** GET /session 이 한 번에 돌려주는 최근 turn 최대 개수 (계약 SESSION_MAX_LIMIT. openapi.json 의 limit 최댓값에서 생성한다) */
+export const SESSION_MAX_LIMIT = SESSION_LIMIT_MAXIMUM;
 
 /** 세션 id 형식 (계약 QueryRequest.session_id 의 pattern). 어기면 서버가 422 로 거절한다 */
 export const SESSION_ID_PATTERN = QUERY_REQUEST_SESSION_ID_PATTERN;

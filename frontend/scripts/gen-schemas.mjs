@@ -8,6 +8,7 @@
 // - 응답 화면 타입: 키는 camelCase, format=date-time 문자열은 ms 숫자, 없을 수 있는 값은 null, 없을 수 있는 배열은 [] 로 채운다
 //   (화면 코드는 undefined 를 다루지 않는다)
 // - 요청: 키만 camelCase 로 바꾼 <이름>Input 타입과 서버 형식 본문 함수(to<이름>Body), 계약 제약 상수(최대 길이 · 형식)를 만든다
+// - 경로 파라미터 · 쿼리 파라미터의 최댓값은 상수(<경로 첫 단어>_<파라미터>_MAXIMUM)로 만든다
 // - 생성 결과는 openapi-typescript 가 만든 openapi.d.ts 와 컴파일 때 맞춰 본다 (이 스크립트의 실수를 잡는다)
 // - 다루지 않는 JSON Schema 기능을 만나면 틀린 코드를 만들지 않고 멈춘다. 설명용 키(examples 등)는 지나간다
 //
@@ -90,7 +91,7 @@ const ANNOTATION_KEYS = new Set([
 
 const HEADER = `// 이 파일은 scripts/gen-schemas.mjs 가 contracts/openapi.json 에서 만든다. 손으로 고치지 않는다 (npm run gen:api).
 // 서버 형식(snake_case) zod 스키마(*Raw), 화면 타입(camelCase), 서버 → 화면 변환 함수(to*), 화면 → 서버 요청 본문 함수(to*Body),
-// 요청 제약 상수(*_MAX_LENGTH · *_PATTERN).
+// 요청 제약 상수(*_MAX_LENGTH · *_PATTERN · *_MAXIMUM).
 
 import { z } from "zod";
 
@@ -643,6 +644,31 @@ ${props.map(([key]) => `    ${key}: request.${camelKey(key)},`).join("\n")}
   return piece;
 }
 
+/** 파라미터 최댓값 상수 (손으로 옮겨 적지 않게). 예: /session/{session_id} 의 limit → SESSION_LIMIT_MAXIMUM */
+function parameterCode(/** @type {Record<string, Record<string, any>>} */ paths) {
+  /** @type {string[]} */
+  const names = [];
+  /** @type {string[]} */
+  const lines = [];
+  for (const [path, ops] of Object.entries(paths)) {
+    const segment = path.split("/").find((s) => s !== "") ?? fail(`잘못된 경로: ${path}`);
+    for (const op of Object.values(ops)) {
+      for (const parameter of op.parameters ?? []) {
+        if (parameter.schema?.maximum !== undefined) {
+          const name = `${upperSnake(segment)}_${upperSnake(parameter.name)}_MAXIMUM`;
+          names.push(name);
+          lines.push(`/** ${path} 의 ${parameter.name} 최댓값 (계약 maximum) */
+export const ${name} = ${parameter.schema.maximum};
+`);
+        }
+      }
+    }
+  }
+  /** @type {Piece} */
+  const piece = { code: lines.join("\n"), checks: [], names };
+  return piece;
+}
+
 /** 생성 결과가 openapi-typescript 의 타입과 같은지 확인하는 타입 목록 */
 function checksCode(/** @type {string[]} */ checks) {
   return `// 생성한 스키마가 openapi-typescript 의 타입(openapi.d.ts)과 같은지 컴파일 때 확인한다 (생성 스크립트의 실수를 잡는다)
@@ -696,6 +722,7 @@ export function generate(api, descriptions = {}) {
       pieces.push(requestCode(ctx, name, s));
     }
   }
+  pieces.push(parameterCode(api.paths));
 
   // 같은 이름을 두 번 내보내지 않는다
   const exported = new Set();
