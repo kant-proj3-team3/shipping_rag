@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 
+import { logUnexpectedError } from "../lib/logger";
+
 interface ErrorBoundaryProps {
   /** 안에서 예외가 나면 보여 줄 안내 */
   message: string;
@@ -10,7 +12,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// 렌더 중 예외를 잡는 API 가 클래스에만 있어 클래스로 둔다. 원인은 React 가 콘솔에 남긴다
+// 렌더 중 예외를 잡는 API 가 클래스에만 있어 클래스로 둔다. 원인은 React 가 콘솔에, 이 경계가 로그 서버에 남긴다
 /**
  * 렌더 중 예외를 잡아 안내와 새로고침 버튼으로 바꾼다 (빈 화면이 되지 않게).
  * 다시 시도하게 하려면 key 를 바꿔 새로 만든다.
@@ -20,6 +22,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true };
+  }
+
+  override componentDidCatch(error: unknown) {
+    logUnexpectedError("화면을 그리다 오류가 났다", error);
   }
 
   override render() {

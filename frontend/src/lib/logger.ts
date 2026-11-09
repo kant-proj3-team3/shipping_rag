@@ -2,7 +2,12 @@
 
 import { z } from "zod";
 
-import { NAME_MAX_LENGTH, TEXT_MAX_LENGTH, type ClientLog } from "../../shared/clientLog";
+import {
+  NAME_MAX_LENGTH,
+  STACK_MAX_LENGTH,
+  TEXT_MAX_LENGTH,
+  type ClientLog,
+} from "../../shared/clientLog";
 import { RequestError } from "../api/client";
 
 const CLIENT_LOG_PATH = "/client-logs"; // nginx 가 로그 서버로 넘긴다
@@ -62,6 +67,22 @@ function summarizeExpected(cause: unknown): ClientLogError | undefined {
   return cause instanceof Error ? nameOnly(cause) : undefined;
 }
 
+/** 예상하지 못한 오류. 원인을 찾으려면 문구와 스택이 필요하다 (JSON.parse 오류만 저장본 조각이 섞일 수 있어 뺀다) */
+function summarizeUnexpected(cause: unknown): ClientLogError | undefined {
+  if (
+    cause instanceof Error &&
+    !(cause instanceof RequestError) &&
+    !(cause instanceof SyntaxError)
+  ) {
+    return {
+      ...nameOnly(cause),
+      message: cause.message.slice(0, TEXT_MAX_LENGTH),
+      stack: cause.stack?.slice(0, STACK_MAX_LENGTH),
+    };
+  }
+  return summarizeExpected(cause);
+}
+
 function sendToLogServer(log: ClientLog): void {
   const { level, error } = log;
   const message = log.message.slice(0, TEXT_MAX_LENGTH);
@@ -96,5 +117,17 @@ export function logWarning(message: string, cause?: unknown, context?: LogContex
       requestId: context?.requestId?.slice(0, NAME_MAX_LENGTH),
       error: summarizeExpected(cause),
     });
+  }
+}
+
+/**
+ * 화면이 깨지거나 아무도 잡지 않은 오류를 배포 빌드의 로그 서버에 남긴다.
+ * 콘솔에는 React 와 브라우저가 이미 남기므로 여기서는 쓰지 않는다.
+ *
+ * @param message 서버 로그에 그대로 남는다. logWarning 의 message 와 같은 기준으로 쓴다
+ */
+export function logUnexpectedError(message: string, cause: unknown): void {
+  if (import.meta.env.PROD) {
+    sendToLogServer({ level: "error", message, error: summarizeUnexpected(cause) });
   }
 }
