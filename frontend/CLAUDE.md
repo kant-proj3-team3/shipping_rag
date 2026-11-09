@@ -4,6 +4,8 @@
 
 질문 입력, 검색 방식 선택, 응답 상태별 화면, 세션 이력 복원. 파이썬 패키지가 아니라 `frontend/`에 둔다.
 
+`server/`는 화면 로그만 받아 `frontend/logs/`의 날짜별 파일에 저장하는 Node.js(winston) 서버다. 질문·답변 요청은 거치지 않는다. `/client-logs`는 프론트엔드 안의 약속이라 `contracts/openapi.json`에 넣지 않는다. 질문·답변·세션 id는 로그로 보내지 않는다(`src/lib/logger.ts`).
+
 ## 소비하는 계약
 
 - `contracts/openapi.json`(`/health`, `/query`, `/session/{session_id}`)이 유일한 약속이다. **TS 타입은 이 파일에서 생성**하고 손으로 따로 쓰지 않는다.

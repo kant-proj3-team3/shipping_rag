@@ -1,5 +1,6 @@
-# Logs
-logs
+# Logs (frontend/logs/ 폴더만 저장소에 둔다. 없으면 Linux 에서 Docker 가 root 소유로 만들어 log-server 가 쓸 수 없다)
+**/logs/*
+!/logs/.gitkeep
 *.log
 npm-debug.log*
 yarn-debug.log*

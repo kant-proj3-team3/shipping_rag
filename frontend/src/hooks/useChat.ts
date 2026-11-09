@@ -157,7 +157,9 @@ export function useChat(): UseChatResult {
     try {
       const response = await ask.mutateAsync({ request, signal: controller.signal });
       if (response.status === "error") {
-        logWarning(`서버가 오류로 답했다 (${response.errorCode ?? "-"})`, response);
+        logWarning(`서버가 오류로 답했다 (${response.errorCode ?? "-"})`, response, {
+          requestId: response.requestId,
+        });
       }
       finish(request.sessionId, answerId, {
         state: "done",

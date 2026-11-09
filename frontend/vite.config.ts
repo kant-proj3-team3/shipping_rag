@@ -10,6 +10,10 @@ const API_TARGET = "http://127.0.0.1:8000";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // 로그 서버가 스택을 원본 위치로 바꿀 때 쓴다. hidden 은 JS 에 소스맵 주소를 남기지 않고, Dockerfile 이 파일을 web 이미지 밖으로 옮긴다
+    sourcemap: "hidden",
+  },
   server: {
     // ^ 로 시작하는 키는 정규식이다. 문자열 키는 앞부분만 맞아도(/healthz · /sessions) 넘기므로 계약 경로만 넘긴다.
     // 정규식은 쿼리 문자열까지 붙은 주소에 맞춰 보므로 끝을 (\?|$) 로 막는다
