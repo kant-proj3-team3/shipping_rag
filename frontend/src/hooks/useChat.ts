@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApi } from "./useApi";
 import { useChatHistory } from "./useChatHistory";
@@ -96,7 +96,12 @@ export function useChat(): UseChatResult {
   const controllerRef = useRef<AbortController | null>(null);
 
   const local = history.conversations.find((c) => c.id === history.currentId);
-  const { status, restored } = sessionViewOf(lookup, local);
+  // memo 된 대화 목록 · 대화 화면에 넘기므로 입력할 때마다 복원 대화를 새로 만들지 않는다
+  const { status, restored } = useMemo(() => sessionViewOf(lookup, local), [lookup, local]);
+  const conversations = useMemo(
+    () => (restored === undefined ? history.conversations : [restored, ...history.conversations]),
+    [restored, history.conversations],
+  );
   // 브라우저에도 서버에도 없는 대화는 새 대화 화면으로 연다
   const currentId = status === "missing" ? undefined : history.currentId;
   const restoredId = restored?.id;
@@ -245,8 +250,7 @@ export function useChat(): UseChatResult {
   );
 
   return {
-    conversations:
-      restored === undefined ? history.conversations : [restored, ...history.conversations],
+    conversations,
     currentId,
     messages: (local ?? restored)?.messages ?? NO_MESSAGES,
     activeId,
