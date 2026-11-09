@@ -12,7 +12,7 @@ interface AssistantMessageProps {
 
 function PendingMessage() {
   return (
-    <div role="status" className="flex items-center gap-3">
+    <div className="flex items-center gap-3">
       <SealLoader />
       <p className="text-sm text-zinc-500 dark:text-zinc-400">오늘도 해내는 중...</p>
     </div>

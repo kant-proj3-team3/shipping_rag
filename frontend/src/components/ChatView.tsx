@@ -91,9 +91,10 @@ export function ChatView({
   if (messages.length === 0) {
     return <EmptyState onPickExample={onPickExample} />;
   }
-  // relative 가 없으면 안쪽 절대 위치 요소(sr-only 라벨)가 이 영역에 잘리지 않고 문서 높이를 늘려 페이지 전체가 스크롤된다
+  // relative 가 없으면 안쪽 절대 위치 요소(sr-only 라벨)가 이 영역에 잘리지 않고 문서 높이를 늘려 페이지 전체가 스크롤된다.
+  // role=log 는 새로 붙는 메시지만 스크린 리더에 알린다 (답변 도착 · 오류. 지난 대화를 열 때는 다시 읽지 않는다)
   return (
-    <div className="relative min-h-0 flex-1 overflow-y-auto" role="region" aria-label="대화">
+    <div className="relative min-h-0 flex-1 overflow-y-auto" role="log" aria-label="대화">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
         {messages.map((m) => (
           <div key={m.id} ref={m === last ? lastRef : undefined} className="scroll-mt-6">
@@ -105,10 +106,7 @@ export function ChatView({
           </div>
         ))}
         {isExpired ? (
-          <p
-            role="status"
-            className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
-          >
+          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             서버에서 만료된 대화입니다. 내용은 그대로 볼 수 있고, 다음 질문은 새 대화로 시작합니다.
           </p>
         ) : null}
