@@ -143,13 +143,22 @@ def test_indexer_refuses_existing_index_without_rebuild(tmp_path):
 
 def test_indexer_excludes_chunks_over_token_limit(tmp_path):
     indexer = PdfIndexer(MockEmbedder(dimension=8, max_input_tokens=5), client=QdrantClient(":memory:"), pdf_reader=_reader)
-    manifest = indexer.build(IndexBuildRequest(documents_dir=_docs(tmp_path, ["IS01.pdf"]), index_name="t-limit"))
-    assert manifest.chunk_count == 0 and any("토큰" in f.reason for f in manifest.failures)
+    # 모든 청크가 한도를 넘으면 색인할 청크가 0개가 되어 멈춘다. 원인(토큰 초과)이 메시지에 남는다
+    with pytest.raises(IngestError, match="토큰"):
+        indexer.build(IndexBuildRequest(documents_dir=_docs(tmp_path, ["IS01.pdf"]), index_name="t-limit"))
 
 
-def test_indexer_missing_folder_is_a_failure_not_a_crash(tmp_path):
-    manifest = _indexer().build(IndexBuildRequest(documents_dir=tmp_path / "nope", index_name="t-none"))
-    assert manifest.chunk_count == 0 and manifest.failures
+@pytest.mark.parametrize(("folder", "reason"), [("nope", "문서 폴더가 없다"), ("empty", "PDF를 찾지 못했다")])
+def test_wrong_documents_dir_keeps_previous_index(tmp_path, folder, reason):
+    # 잘못된 폴더로 rebuild=True 를 해도 기존 인덱스와 manifest 가 그대로 남아야 한다
+    client = QdrantClient(":memory:")
+    indexer = _indexer(client)
+    first = indexer.build(IndexBuildRequest(documents_dir=_docs(tmp_path, ["IS01.pdf"]), index_name="t-keep"))
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(IngestError, match=reason):
+        indexer.build(IndexBuildRequest(documents_dir=tmp_path / folder, index_name="t-keep", rebuild=True))
+    assert indexer.get_manifest("t-keep") == first
+    assert client.count("t-keep").count == first.chunk_count
 
 
 # ── 진입점 ────────────────────────────────────────────────────────────

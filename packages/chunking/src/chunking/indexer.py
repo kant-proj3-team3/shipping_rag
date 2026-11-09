@@ -4,6 +4,7 @@
 - 실패는 조용히 건너뛰지 않고 manifest.failures 에 남긴다: 읽을 수 없는 PDF, 중복 book_id, 본문이 없는 문서·페이지,
   토큰 한도를 넘는 청크.
 - 임베딩이 끝난 뒤에 기존 인덱스를 지우고 쓴다. 재색인 도중 실패해도 이전 인덱스가 먼저 사라지지 않게 한다.
+- 색인할 청크가 0개면 기존 인덱스를 건드리지 않고 IngestError 로 멈춘다 (documents_dir 를 잘못 줬을 때 등).
 - manifest 는 맨 마지막에 저장한다. manifest 가 있으면 청크 저장이 끝난 인덱스라는 뜻이다.
 - 설정: CHUNK_MAX_CHARS(청크 최대 글자 수, 기본 700). Qdrant 주소는 qdrant_store 참고.
 """
@@ -68,6 +69,10 @@ class PdfIndexer:
         failures: list[IngestFailure] = []
         chunks, document_count = self._parse_and_chunk(request.documents_dir, failures, report)
         chunks, observed_max = self._check_token_limit(chunks, failures, report)
+        if not chunks:
+            # 빈 인덱스를 "완성된 인덱스"로 저장하지 않는다. 기존 인덱스를 지우기 전에 멈춰서 이전 인덱스를 지킨다.
+            reasons = "; ".join(f"{f.book_id}: {f.reason}" for f in failures[:5]) or "원인 미상"
+            raise IngestError(f"색인할 청크가 없다 (기존 인덱스는 그대로 둔다): {reasons}")
 
         vectors: list[list[float]] = []
         for start in range(0, len(chunks), _EMBED_BATCH):

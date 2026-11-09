@@ -27,7 +27,7 @@ PDF를 읽어 청킹하고, 임베딩해 Qdrant에 색인하고, 인덱스의 �
 | `EMBEDDING_BATCH_SIZE` | `64` | GPU 메모리가 부족하면 줄인다 |
 | `RAG_MODEL_CACHE` | (라이브러리 기본) | 모델 다운로드 위치 |
 | `CHUNK_MAX_CHARS` | `700` | 청크 최대 글자 수 |
-| `QDRANT_URL` / `QDRANT_PATH` | `http://localhost:6333` / 없음 | `QDRANT_PATH`가 있으면 서버 없는 로컬 모드 (단독 개발용) |
+| `QDRANT_URL` / `QDRANT_PATH` | `http://localhost:6333` / 없음 | `QDRANT_PATH`가 있으면 서버 없는 로컬 모드 (단독 개발용). 로컬 모드는 한 번에 한 프로세스만 열 수 있다. 색인과 api를 함께 쓰려면 Qdrant 서버(`QDRANT_URL`)를 쓴다 |
 | `DOCUMENTS_DIR` / `EVALUATION_DIR` | `./data/documents` / `./data/evaluation` | 골든셋 점검에 쓴다 (색인 폴더는 `IndexBuildRequest.documents_dir`) |
 
 ## 실행
@@ -91,6 +91,8 @@ uv run python -m app.cli index            # 같은 index_name 이 있으면 --re
 - **결정**: 청크 컬렉션 이름은 `index_name`(이름 없는 기본 벡터, 코사인). manifest는 `<index_name>__manifest` 컬렉션의 점 하나에 저장한다. 점 id는 `chunk_id`로 만든 UUID다.
 - **이유**: api·cli가 다른 프로세스에서도 `get_manifest`로 같은 값을 읽어야 한다. 청크 컬렉션에 섞으면 검색 모듈이 BM25용으로 모든 점을 `Chunk`로 읽을 때 깨진다.
 - 임베딩이 끝난 뒤 기존 인덱스를 지우고 쓴다(재색인 도중 실패해도 이전 인덱스가 먼저 사라지지 않게). manifest는 맨 마지막에 저장한다.
+- 색인할 청크가 0개면(폴더 경로 오류, PDF 없음, 전부 실패) 기존 인덱스를 지우기 전에 `IngestError`로 멈춘다. 빈 인덱스가 "준비된 인덱스"로 보이지 않게 하려는 것이다.
+- Qdrant 클라이언트를 닫는 `close()`는 두지 않는다. 클라이언트를 언제 열고 닫을지는 그것을 쓰는 쪽(api·cli)이 정한다. 로컬 모드(`QDRANT_PATH`)에서 여러 요청이 같은 저장소를 쓰지 않도록 막는 잠금(락)도 백엔드가 맡는다. 필요해지면 `close()`를 추가한다.
 - `manifest.max_chunk_tokens`는 임베더 한도(512)다. 실제 최대 토큰 수는 `params.observed_max_chunk_tokens`에 남긴다.
 
 ### 5. 골든셋은 평가 파일을 그대로 정규화하고 점검한다
