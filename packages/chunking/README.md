@@ -2,37 +2,41 @@
 
 PDF를 읽어 청킹하고, 임베딩해 Qdrant에 색인하고, 인덱스의 신원(`IndexManifest`)을 기록한다. 평가용 골든 데이터셋(`GoldenItem`)도 이 모듈이 정규화해 제공한다. 검색 로직과 LLM 호출은 하지 않는다.
 
-> 현재 상태: **청킹 구현 중**. PDF 추출(`pdf_parser.py`)과 청킹(`chunker.py`)을 구현했다. 임베딩·색인·골든셋은 다음 PR에서 추가하며, 그때까지 `create_*`는 `src/chunking/mock/`의 목업을 돌려준다.
+> 현재 상태: **실제 구현 있음, 기본값은 목업**. `CHUNKING_IMPL=real`이면 실제 구현을, 없으면 `src/chunking/mock/`의 목업을 돌려준다. 실제 구현은 PDF·모델·Qdrant가 필요해서, CI와 다른 모듈의 개발이 깨지지 않도록 기본값을 목업으로 둔다.
 
 ## 공개 인터페이스
 
 `common.interfaces`의 Protocol 세 개를 제공한다. 진입점은 `common.entrypoints`의 시그니처를 따른다.
 
-| 진입점 | 반환 | 역할 |
+| 진입점 | 반환 (실제 구현) | 역할 |
 |---|---|---|
-| `create_embedder()` | `Embedder` | 텍스트 → 벡터. 검색·평가 모듈에 주입된다 |
-| `create_indexer(embedder)` | `Indexer` | `build(IndexBuildRequest) -> IndexManifest`, `get_manifest(index_name)` |
-| `create_golden_provider()` | `GoldenDatasetProvider` | `load(splits)`, `fingerprint(splits)` |
+| `create_embedder()` | `Embedder` (`E5Embedder`) | 텍스트 → 벡터. 검색·평가 모듈에 주입된다 |
+| `create_indexer(embedder)` | `Indexer` (`PdfIndexer`) | `build(IndexBuildRequest) -> IndexManifest`, `get_manifest(index_name)` |
+| `create_golden_provider()` | `GoldenDatasetProvider` (`EvaluationGoldenProvider`) | `load(splits)`, `fingerprint(splits)` |
 
-주입받는 것은 없다. 설정(Qdrant 주소, 모델 캐시, 문서 경로)은 환경변수로 읽는다.
+주입받는 것은 없다.
 
-## 지킬 계약 (요약)
+## 환경변수
 
-- `book_id`는 파일명에서 `.pdf`를 뺀 값, 첫 페이지는 1쪽이다.
-- `chunk_id`는 결정적이고, 모든 청크는 `manifest.max_chunk_tokens` 이하다. 색인 payload는 `Chunk` 스키마다.
-- `embedder_id`는 모델·접두사·정규화·최대 길이를 구분하고, 한도 초과 입력은 조용히 자르지 않는다(질의는 `InvalidInputError`, 문서는 `IngestError`).
-- 빈 본문·중복 `book_id`·읽을 수 없는 PDF는 `manifest.failures`에 기록하고 색인에서 뺀다.
-- 정답·채점 기준은 색인하지 않는다. 서비스에는 `question`만 전달된다.
+| 이름 | 기본값 | 설명 |
+|---|---|---|
+| `CHUNKING_IMPL` | `mock` | `real`이면 실제 구현 |
+| `EMBEDDING_MODEL` | `intfloat/multilingual-e5-base` | 임베딩 모델 |
+| `EMBEDDING_MAX_TOKENS` | `512` | 접두사를 포함한 입력 상한. 바꾸면 `embedder_id`가 바뀐다 |
+| `EMBEDDING_DEVICE` | (자동) | `cuda` / `cpu`. 비우면 GPU가 있으면 `cuda` |
+| `EMBEDDING_BATCH_SIZE` | `64` | GPU 메모리가 부족하면 줄인다 |
+| `RAG_MODEL_CACHE` | (라이브러리 기본) | 모델 다운로드 위치 |
+| `CHUNK_MAX_CHARS` | `700` | 청크 최대 글자 수 |
+| `QDRANT_URL` / `QDRANT_PATH` | `http://localhost:6333` / 없음 | `QDRANT_PATH`가 있으면 서버 없는 로컬 모드 (단독 개발용). 로컬 모드는 한 번에 한 프로세스만 열 수 있다. 색인과 api를 함께 쓰려면 Qdrant 서버(`QDRANT_URL`)를 쓴다 |
+| `DOCUMENTS_DIR` / `EVALUATION_DIR` | `./data/documents` / `./data/evaluation` | 골든셋 점검에 쓴다 (색인 폴더는 `IndexBuildRequest.documents_dir`) |
 
-자세한 규칙은 [`CLAUDE.md`](CLAUDE.md)와 루트 [`CONTRACTS.md`](../../CONTRACTS.md)를 본다.
+## 실행
 
-## 목업 (`src/chunking/mock/`)
-
-| 클래스 | 동작 |
-|---|---|
-| `MockEmbedder` | 해시 기반 결정적 벡터(길이 16). 한도 초과 오류 규칙은 실제와 같다 |
-| `MockIndexer` | PDF를 읽지 않고 폴더의 PDF 개수만 센다. `chunk_count`는 고정값(`params.mock=true`로 표시). manifest를 `MOCK_INDEX_DIR`(기본 `./.mock_index`)에 저장해 프로세스가 바뀌어도 유지하며, `build` 전에는 `get_manifest`가 `None`이다. `MOCK_INDEX_READY=1`이면 저장 없이 데모 인덱스를 돌려준다(화면·API 시연용). 같은 이름을 `rebuild=False`로 다시 만들면 `IngestError` |
-| `MockGoldenProvider` | 데모 문항 4개. `security`는 기본 제외 |
+```bash
+# .env 에 CHUNKING_IMPL=real, INDEX_NAME=rag-dev-<본인이름> 을 넣은 뒤
+docker compose up -d qdrant
+uv run python -m app.cli index            # 같은 index_name 이 있으면 --rebuild 로만 덮어쓴다
+```
 
 ## 파일 구성
 
@@ -40,6 +44,10 @@ PDF를 읽어 청킹하고, 임베딩해 Qdrant에 색인하고, 인덱스의 �
 |---|---|
 | `pdf_parser.py` | pdfplumber로 PDF 페이지를 구역(제목·설명·표·메모·정리)으로 나눈다 |
 | `chunker.py` | 페이지 구역 → `Chunk` |
+| `embedder.py` | E5 임베더 |
+| `qdrant_store.py` | Qdrant 컬렉션과 manifest 저장 |
+| `indexer.py` | 위 단계를 묶어 색인한다 (parse → chunk → embed → upsert) |
+| `golden.py` | 평가 파일 → `GoldenItem` |
 | `mock/` | 목업 (인터페이스를 그대로 만족하도록 유지한다) |
 
 ## 주요 설계 결정
@@ -64,9 +72,38 @@ PDF를 읽어 청킹하고, 임베딩해 Qdrant에 색인하고, 인덱스의 �
 - **결과**: 청크 15,053개 (설명 3,750 / 표 6,247 / 메모 1,306 / 정리 3,750). e5 토크나이저 기준(접두사 포함) 512토큰을 넘는 청크 0개. 모든 청크가 `page_start == page_end`라 페이지 단위 평가에도 그대로 쓸 수 있다.
 - `chunk_id`는 `<book_id>-p<page>-c<번호>`라서 같은 문서·내용·조건이면 항상 같다. 페이지 소제목·장 제목·구역 종류는 `metadata`의 `subtitle`·`section`·`kind`에 둔다.
 
+### 3. 임베딩은 multilingual-e5-base
+
+- **결정**: `intfloat/multilingual-e5-base`, 문서 `passage: ` / 질의 `query: `, L2 정규화, 최대 512토큰.
+- **이유**: 같은 청크로 small/base/large를 의미 검색만으로 비교했다 (질문 56개, 근거 없는 4개 제외, 문서 단위). k=5에서 base가 가장 좋았고 large보다 색인은 3.3배, 검색은 1.6배 빨랐다.
+
+| 모델 | Hit@5 | Recall@5 | 색인 시간 (RTX 5060) |
+|---|---|---|---|
+| small | 0.946 | 0.653 | 30초 |
+| base | 1.000 | 0.711 | 87초 |
+| large | 0.982 | 0.684 | 288초 |
+
+  이 표는 팀 평가기(근거 그룹 단위) 이전의 개인 실험 지표라 팀 보고서 숫자와 직접 비교하지 않는다.
+- `count_tokens`는 문서 접두사를 붙인 길이(특수 토큰 포함)를 센다. 인덱서는 이 값으로 모든 청크가 `max_input_tokens` 이하인지 확인하고, 넘는 청크는 `failures`에 기록하고 뺀다.
+
+### 4. manifest는 Qdrant의 별도 컬렉션에 저장한다
+
+- **결정**: 청크 컬렉션 이름은 `index_name`(이름 없는 기본 벡터, 코사인). manifest는 `<index_name>__manifest` 컬렉션의 점 하나에 저장한다. 점 id는 `chunk_id`로 만든 UUID다.
+- **이유**: api·cli가 다른 프로세스에서도 `get_manifest`로 같은 값을 읽어야 한다. 청크 컬렉션에 섞으면 검색 모듈이 BM25용으로 모든 점을 `Chunk`로 읽을 때 깨진다.
+- 임베딩이 끝난 뒤 기존 인덱스를 지우고 쓴다(재색인 도중 실패해도 이전 인덱스가 먼저 사라지지 않게). manifest는 맨 마지막에 저장한다.
+- 색인할 청크가 0개면(폴더 경로 오류, PDF 없음, 전부 실패) 기존 인덱스를 지우기 전에 `IngestError`로 멈춘다. 빈 인덱스가 "준비된 인덱스"로 보이지 않게 하려는 것이다.
+- Qdrant 클라이언트를 닫는 `close()`는 두지 않는다. 클라이언트를 언제 열고 닫을지는 그것을 쓰는 쪽(api·cli)이 정한다. 로컬 모드(`QDRANT_PATH`)에서 여러 요청이 같은 저장소를 쓰지 않도록 막는 잠금(락)도 백엔드가 맡는다. 필요해지면 `close()`를 추가한다.
+- `manifest.max_chunk_tokens`는 임베더 한도(512)다. 실제 최대 토큰 수는 `params.observed_max_chunk_tokens`에 남긴다.
+
+### 5. 골든셋은 평가 파일을 그대로 정규화하고 점검한다
+
+- **결정**: `scripts/check_dataset_mapping.py`의 `raw_to_golden()`과 같은 매핑. id 중복, `*_questions.json`과의 id·질문 일치, 근거 `book_id`·`page`가 실제 PDF 범위 안인지 확인하고, 어긋나면 `IngestError`.
+- **결과**: 기본 60문항(보안 포함 62문항), 근거 189곳. 근거 `quote` 189곳이 모두 해당 페이지의 청크 안에 있다(띄어쓰기·`|` 무시).
 
 ## 테스트
 
 ```bash
 uv run pytest packages/chunking
 ```
+
+`tests/test_chunking_real.py`는 PDF·모델·Qdrant 서버 없이 돈다 (가짜 페이지 구역, 가짜 모델, 메모리 Qdrant).

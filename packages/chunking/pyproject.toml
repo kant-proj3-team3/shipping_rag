@@ -7,6 +7,8 @@ dependencies = [
     "common",
     "pydantic>=2.7",
     "pdfplumber==0.11.10",          # 표 인식·글자 크기. 버전이 바뀌면 추출 결과가 달라질 수 있어 고정한다
+    "qdrant-client>=1.10",
+    "sentence-transformers>=3.0",   # E5 임베딩 (retrieval 과 같은 범위)
 ]
 
 [build-system]

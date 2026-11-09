@@ -2,9 +2,9 @@
 
 CHUNKING_IMPL 환경변수로 구현을 고른다.
 - 없거나 "mock": 목업 (기본값). PDF·Qdrant·모델 없이 돌아가서 CI 와 다른 모듈의 개발·테스트가 그대로 동작한다.
-- "real": 실제 구현. 지금은 골든셋만 실제 구현이 있고, 임베더·인덱서는 아직 목업이다.
+- "real": 실제 구현. pdfplumber 구조 청킹 → E5 임베딩 → Qdrant 색인, 평가 파일 기반 골든셋.
 
-실제 구현은 고를 때만 불러온다.
+실제 구현은 무거운 라이브러리(sentence-transformers 등)를 쓰므로, 고를 때만 불러온다.
 """
 
 from __future__ import annotations
@@ -21,10 +21,18 @@ def _use_real() -> bool:
 
 
 def create_embedder() -> Embedder:
+    if _use_real():
+        from .embedder import E5Embedder
+
+        return E5Embedder()
     return MockEmbedder()
 
 
 def create_indexer(embedder: Embedder) -> Indexer:
+    if _use_real():
+        from .indexer import PdfIndexer
+
+        return PdfIndexer(embedder)
     return MockIndexer(embedder)
 
 
