@@ -11,8 +11,8 @@
 | A | 프롬프트·출력 스키마 | 1 | 완료(#5) |
 | B | 문맥 빌더 | 1 | 완료(#7) |
 | C | LangChain 체인 | 1 | 완료(#9) |
-| D | 출력 검증·출처 매핑 | 1 | 구현 완료(PR 대기) |
-| E | 오류 매핑 | 1 | 미착수 |
+| D | 출력 검증·출처 매핑 | 1 | 완료(#13) |
+| E | 오류 매핑 | 1 | 구현 완료(PR 대기) |
 | F | Langfuse 트레이싱 | 2 | 미착수 |
 | G | Redis 세션 | 3 | 미착수 |
 | H | Redis 캐시 | 3 | 미착수 |
@@ -141,10 +141,18 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 세션 기록은 G 전까지 목업 저장소를 쓴다. `error`는 기록하지 않는다.
 - **파일**: `src/backend/qa.py`
 - **완료 기준**
-  - [ ] 정상 / 빈 검색 / 근거 부족(abstained) / 되묻기 / 모델 오류 / 출력 오류 / 입력 오류가 각각 테스트로 구분된다.
-  - [ ] `status=error`는 코드만 만든다(모델 출력에서 올 수 없다).
-  - [ ] 실패한 요청도 `latency_ms`가 채워진다.
-  - [ ] 기존 목업과 같은 `QAService` 인터페이스를 만족한다(`runtime_checkable` 검사).
+  - [x] 정상 / 빈 검색 / 근거 부족(abstained) / 되묻기 / 모델 오류 / 출력 오류 / 입력 오류가 각각 테스트로 구분된다.
+  - [x] `status=error`는 코드만 만든다(모델 출력에서 올 수 없다).
+  - [x] 실패한 요청도 `latency_ms`가 채워진다.
+  - [x] 기존 목업과 같은 `QAService` 인터페이스를 만족한다(`runtime_checkable` 검사).
+- **구현 메모**
+  - `BackendQAService(retriever, chain, sessions, *, default_mode, k, variant)`. 협력 객체는 모두 주입받는다. 진입점 `create_qa_service`는 아직 목업을 돌려준다(전환은 I 단계).
+  - 흐름: 검색 → `build_context`(예산은 `context_max_tokens()`) → 빈 문맥이면 모델 없이 `abstained` → `generate_validated` → 응답. 예산 때문에 문맥이 빈 경우도 같은 abstained이고 `reason`만 다르다.
+  - 예외 매핑은 `error_code_for`가 한다. 목록에 없는 예외(`IngestError` 포함)는 `internal`이다. 사용자 문구·`reason`은 코드별 고정 문자열이고, 예외 메시지·스택은 서버 로그(`logger.warning`)에만 남긴다. `CancelledError` 같은 BaseException은 잡지 않는다.
+  - 토큰: 정상·`output_invalid`는 확인된 합계(모르면 `None`), 모델 호출이 예외로 끝난 요청과 모델을 부르지 않은 요청은 `None`이다. `cost_usd`·`trace_id`는 `None`(F 이후 채운다).
+  - `final_context`: 문맥을 만든 뒤의 응답(정상·보류·모델 오류·출력 오류)에는 모델에 전달한(하려던) 문맥을 담고, 검색 단계 오류와 빈 문맥은 빈 목록이다. 평가기가 오류 응답의 문맥도 볼 수 있게 한 임시 선택이다.
+  - 세션: `append(session_id, turn)`을 가진 저장소를 주입받는다(G 전까지 `InMemorySessionStore`). `error`는 기록하지 않고, 기록이 실패해도 답변은 그대로 나간다. `latency_ms`는 기록 직전까지의 시간이다.
+  - 검색 개수 `k`(기본 5)와 기본 모드(`hybrid`)는 목업과 같은 **임시** 값이다. 환경변수는 아직 만들지 않았다(H·I에서 정한다).
 - **테스트**: `tests/test_qa.py`(목업 Retriever + 가짜 LLM, `pytest-asyncio` 또는 `asyncio.run`).
 
 ---
