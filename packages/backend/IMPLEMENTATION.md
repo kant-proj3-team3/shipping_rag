@@ -10,8 +10,8 @@
 |---|---|---|---|
 | A | 프롬프트·출력 스키마 | 1 | 완료(#5) |
 | B | 문맥 빌더 | 1 | 완료(#7) |
-| C | LangChain 체인 | 1 | 구현 완료(PR 대기) |
-| D | 출력 검증·출처 매핑 | 1 | 미착수 |
+| C | LangChain 체인 | 1 | 완료(#9) |
+| D | 출력 검증·출처 매핑 | 1 | 구현 완료(PR 대기) |
 | E | 오류 매핑 | 1 | 미착수 |
 | F | Langfuse 트레이싱 | 2 | 미착수 |
 | G | Redis 세션 | 3 | 미착수 |
@@ -113,10 +113,19 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - `Citation`은 문맥 대응표에서 코드가 만든다. 모델이 쓴 문서명·페이지는 쓰지 않는다.
 - **파일**: `src/backend/validate.py`
 - **완료 기준**
-  - [ ] 잘못된 JSON, 필드 누락, 알 수 없는 status, 문맥에 없는 `source_id`를 각각 거부한다.
-  - [ ] 재생성이 제한 횟수를 넘지 않는다.
-  - [ ] 응답의 문서명·페이지가 항상 `Chunk` 값과 같다.
-- **테스트**: 위 실패 유형별 케이스, 재생성 후 성공 케이스.
+  - [x] 잘못된 JSON, 필드 누락, 알 수 없는 status는 C의 파서(`ModelOutput` 스키마)가, 문맥에 없는 `source_id`는 `validate_output`이 각각 거부한다.
+  - [x] 재생성이 제한 횟수를 넘지 않는다.
+  - [x] 응답의 문서명·페이지가 항상 `Chunk` 값과 같다.
+- **구현 메모**
+  - 검증 세 겹: ① 구문·타입, ② 필드 관계(answered는 출처 1개 이상, 중복 없음)는 `ModelOutput` 스키마가, ③ 출처 범위는 `validate.py`가 한다. 범위는 **이번 요청의 `ContextItem`** 만 기준이다.
+  - 출처 정책: 범위 밖 `source_id`는 status와 무관하게 항상 거부한다. `abstained`·`needs_clarification`의 `source_ids`는 범위 안이면 허용한다(자료 충돌로 보류할 때 양쪽 자료를 근거로 들 수 있다). `answered`는 1개 이상 필수다.
+  - `Citation.page`가 정수 하나라서, 여러 페이지에 걸친 청크는 **페이지마다 Citation을 하나씩** 만든다(같은 `source_id`에 page만 다름). 첫 페이지만 남기면 나머지가 사라지기 때문이다. 계약을 바꾸지 않은 임시 선택이며, 다르게 하려면 팀과 정한다.
+  - `generate_validated(chain, question, context, variant, *, callbacks, max_regen)`가 생성→검증→재생성을 한다. 상한은 두 가지다: 재생성 횟수(`OUTPUT_MAX_REGENERATIONS`, 기본 1, **임시**)와 요청 전체 모델 호출 수(`LLM_MAX_CALLS`, 체인 재시도·재생성 합). 먼저 닿는 쪽에서 멈춘다. 이를 위해 `AnswerChain.generate`에 `attempt_limit` 인자를 추가했다.
+  - 끝내 통과하지 못하면 예외가 아니라 `ValidationOutcome(answer=None, failure=...)`로 돌려준다. E가 `output_invalid`로 바꾼다. `failure`에는 모델 원문을 넣지 않는다.
+  - 토큰·호출 수는 모든 호출의 합이다. 하나라도 사용량을 모르면 `None`이다. 호출 실패(`ModelTimeoutError`/`ModelCallError`)는 그대로 던지며, 재생성 도중 실패하면 앞선 호출의 토큰은 응답에 담지 못한다(확인된 값만 집계).
+  - 빈 문맥으로는 호출하지 않는다(`ValueError`). 빈 문맥은 E가 모델 없이 `abstained`로 처리한다.
+  - 이 검증은 문장이 그 자료로 지지되는지는 확인하지 못한다(J의 평가와 사람의 대조 몫).
+- **테스트**: `tests/test_validate.py`(출처 범위, status별 출처 허용, Citation 매핑·여러 페이지, 재생성 한도·호출 상한·토큰 합산).
 
 ### E. 오류 매핑과 QAService 조립
 

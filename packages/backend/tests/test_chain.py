@@ -259,3 +259,23 @@ def test_prompt_with_braces_is_not_treated_as_template():
     llm = FakeLLM(_msg(GOOD))
     run(_chain(llm).generate("q", "c"))
     assert '{"status"' in llm.last_messages[0].content
+
+
+# ── 호출 수 상한 인자(검증 단계가 요청 전체 호출 수를 지키려고 넘긴다) ──
+def test_attempt_limit_lowers_attempts():
+    llm = FakeLLM(*[RuntimeError("x")] * 5)
+    with pytest.raises(ModelCallError):
+        run(_chain(llm, max_retries=10, max_calls=10).generate("q", "c", attempt_limit=2))
+    assert llm.calls == 2
+
+
+def test_attempt_limit_cannot_exceed_config():
+    llm = FakeLLM(*[RuntimeError("x")] * 5)
+    with pytest.raises(ModelCallError):
+        run(_chain(llm, max_retries=1).generate("q", "c", attempt_limit=9))
+    assert llm.calls == 2
+
+
+def test_attempt_limit_is_at_least_one():
+    llm = FakeLLM(_msg(GOOD))
+    assert run(_chain(llm).generate("q", "c", attempt_limit=0)).attempts == 1
