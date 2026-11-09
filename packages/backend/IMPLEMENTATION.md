@@ -12,8 +12,8 @@
 | B | 문맥 빌더 | 1 | 완료(#7) |
 | C | LangChain 체인 | 1 | 완료(#9) |
 | D | 출력 검증·출처 매핑 | 1 | 완료(#13) |
-| E | 오류 매핑 | 1 | 구현 완료(PR 대기) |
-| F | Langfuse 트레이싱 | 2 | 미착수 |
+| E | 오류 매핑 | 1 | 완료(#15) |
+| F | Langfuse 트레이싱 | 2 | 구현 완료(PR 대기) |
 | G | Redis 세션 | 3 | 미착수 |
 | H | Redis 캐시 | 3 | 미착수 |
 | I | 라우터·`create_*` 진입점 | 4 | 미착수 |
@@ -169,11 +169,22 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 키·개인정보는 기록하지 않는다. LangChain 콜백 핸들러를 쓰되, 필요한 항목은 명시적으로 추가한다.
 - **파일**: `src/backend/tracing.py`
 - **완료 기준**
-  - [ ] 정상·abstained·error 요청 모두 트레이스가 남고 `request_id`로 찾을 수 있다.
-  - [ ] Langfuse가 꺼져 있어도 `/query`가 정상 응답한다.
-  - [ ] 성공 시 `meta.trace_id`가 채워진다.
-  - [ ] 실제 Langfuse(또는 로컬 인스턴스)에서 한 건을 눈으로 확인하고 README 확인 방법에 적는다.
-- **테스트**: 가짜 트레이서로 기록 항목과 장애 격리 확인. 실제 연결은 수동 확인.
+  - [x] 정상·abstained·error 요청 모두 트레이스가 남고 `request_id`로 찾을 수 있다(`trace_id`는 `request_id`에서 결정적으로 만든다).
+  - [x] Langfuse가 꺼져 있어도 `/query`가 정상 응답한다(키 없음·SDK 초기화 실패·호출마다 예외 모두 테스트).
+  - [x] 성공 시 `meta.trace_id`가 채워진다(오류 응답에도 채운다. 기록을 시작하지 못하면 `None`).
+  - [x] 실제 Langfuse에서 한 건을 눈으로 확인하고 README 확인 방법에 적는다. → 가상 질문 3건(정상·abstained·error, 가짜 LLM)과 **실제 모델(`gpt-6-luna`) 1건**을 JP 리전에 보내 서버에서 재조회했다. `ChatOpenAI` GENERATION에 종료 시각, system·user 메시지와 `[S1]` 문맥, 구조화 JSON 출력, 토큰이 있고 응답 `meta`와 합이 같다(README 「Langfuse 기록 확인」).
+- **구현 메모**
+  - `Tracer`/`RequestTrace` Protocol을 주입한다. 구현은 `NoopTracer`(키 없음), `LangfuseTracer`(SDK 클라이언트 주입)이고, 서비스는 주입받은 트레이서를 `guard()`로 감싸 모든 예외를 삼킨다. `chain.py`는 고치지 않았다(콜백만 넘긴다).
+  - SDK는 `langfuse>=5.2`(설치 5.2.0). 강의 자료(LLMOps 1장)의 v3 패턴과 달리 5.x의 `start_observation`·`CallbackHandler(trace_context=...)`를 쓴다. 콜백 핸들러에 부모 span을 명시해 컨텍스트 변수에 기대지 않는다.
+  - 트리: `qa-query` > `retrieve`, `build-context`, `generate-answer`(콜백). `retrieve`는 순위·점수·chunk_id만(본문 제외), `build-context`는 전후 개수·S번호↔chunk_id·제외 chunk_id. 실제 모델 입력은 콜백이 만든 모델 호출 단계에 남는다.
+  - `trace_id`는 로컬 식별자이고 서버 도착은 보장하지 않는다. 요청 경로에서 `flush()`를 부르지 않는다(네트워크가 막히면 오래 걸린다). 종료 전 수동 전송은 `flush()`.
+  - 마스킹은 SDK의 `mask_otel_spans`(전송 직전, 문자열 속성)로 이메일·키를 가린다. 정규식 한계는 README에 적었다.
+  - `cost_usd`는 `None`으로 둔다(서버 비용은 응답 시점에 모른다).
+  - 환경변수: `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`(둘 다 있어야 켠다), 주소는 SDK가 `LANGFUSE_BASE_URL`·`LANGFUSE_HOST`를 모두 읽는다(`.env.example`은 `HOST`라 그대로 동작), `LANGFUSE_TRACING_ENABLED=false`로 끈다.
+  - `create_qa_service`(진입점)는 아직 목업이다. 실제 서비스에 `create_tracer()`를 주입하는 일은 I 단계에서 한다.
+  - 한계: 응답 `meta.trace_id`만으로는 서버에 저장됐는지 알 수 없다.
+  - 실제 모델 확인에서 알게 된 것: ① Langfuse는 토큰을 세분해 보여 준다(입력 = 비캐시 + 캐시 생성, 출력 = 일반 + 추론). 합치면 응답 `meta`의 입출력 토큰과 같다(1,079/122 확인). 화면의 "input 3"은 비캐시분만이다. ② 구조화 출력을 쓰면 LangChain 내부 노드(`RunnableSequence`, `RunnableParallel`, `_check_refusal` 등)가 따로 기록돼 요청 하나가 observation 16개가 된다. 기능 문제는 아니고 화면 잡음이다. 걸러내려면 콜백에서 내부 노드를 제외하는 별도 작업이 필요하다(미정). ③ 서버가 계산한 비용(약 $0.0002)이 있지만 응답 `cost_usd`는 `None`으로 둔다.
+- **테스트**: `tests/test_tracing.py` — 가짜 트레이서(기록 항목, 검색 미발견↔문맥 축소 구분, 취소, 장애 격리), 실제 SDK를 메모리 exporter에 연결한 호출 형태 검증(같은 trace·부모 연결·이메일 마스킹·오류 level), `create_tracer` 분기, 마스킹. 실제 서버 연결은 수동 확인.
 
 ---
 
