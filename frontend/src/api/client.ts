@@ -1,4 +1,4 @@
-// 화면이 서버에 요청하는 계약. 구현은 mockClient.ts(목업) · httpClient.ts(실제 서버)이고, 앱 루트에서 ApiProvider 로 끼운다.
+// 화면이 서버에 요청하는 계약. 구현은 httpClient.ts 이고, 앱 루트에서 ApiProvider 로 끼운다.
 
 import type { HealthResponse, QueryRequest, QueryResponse, SessionInfo } from "./types";
 

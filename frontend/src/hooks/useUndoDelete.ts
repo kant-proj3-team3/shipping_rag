@@ -13,7 +13,7 @@ export interface UseUndoDeleteResult {
   lastDeleted: Conversation | undefined;
   /** 대화를 지우고 UNDO_DELETE_MS 동안 실행 취소를 받는다. 없는 id 면 아무 일도 없다 */
   remove: (id: string) => void;
-  /** 방금 지운 대화를 되돌린다. 목록은 최근 활동순이라 원래 자리로 돌아간다 */
+  /** 방금 지운 대화를 되돌린다. 목록은 최근 활동순이라 원래 자리로 돌아가고, 보고 있던 대화였으면 다시 연다 */
   undoRemove: () => void;
 }
 
@@ -24,6 +24,7 @@ export function useUndoDelete({
 }: Pick<UseChatHistoryResult, "historyRef" | "updateHistory">): UseUndoDeleteResult {
   const [lastDeleted, setLastDeleted] = useState<Conversation>();
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const wasCurrentRef = useRef(false);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -34,6 +35,7 @@ export function useUndoDelete({
       if (!conversation) {
         return;
       }
+      wasCurrentRef.current = historyRef.current.currentId === id;
       updateHistory(
         (h) => ({
           currentId: h.currentId === id ? undefined : h.currentId,
@@ -53,10 +55,14 @@ export function useUndoDelete({
       return;
     }
     updateHistory(
-      (h) =>
-        h.conversations.some((c) => c.id === lastDeleted.id)
-          ? h
-          : { ...h, conversations: sortByRecent([...h.conversations, lastDeleted]) },
+      (h) => ({
+        conversations: h.conversations.some((c) => c.id === lastDeleted.id)
+          ? h.conversations
+          : sortByRecent([...h.conversations, lastDeleted]),
+        // 그사이 다른 대화로 옮겼으면 그 화면을 빼앗지 않는다
+        currentId:
+          wasCurrentRef.current && h.currentId === undefined ? lastDeleted.id : h.currentId,
+      }),
       true,
     );
     setLastDeleted(undefined);

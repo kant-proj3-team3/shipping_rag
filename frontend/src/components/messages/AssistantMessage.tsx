@@ -1,5 +1,6 @@
 import { AnswerCard } from "./AnswerCard";
 import { ErrorMessage } from "./ErrorMessage";
+import { SealLoader } from "./SealLoader";
 import type { AnswerMessage } from "../../lib/chat";
 import { REQUEST_ERROR_TEXT } from "../../lib/labels";
 
@@ -11,13 +12,9 @@ interface AssistantMessageProps {
 
 function PendingMessage() {
   return (
-    <div role="status" className="space-y-3">
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">자료를 찾아 답변을 만드는 중...</p>
-      <div className="space-y-2" aria-hidden="true">
-        <div className="h-3 w-11/12 rounded bg-zinc-200 motion-safe:animate-pulse dark:bg-zinc-800" />
-        <div className="h-3 w-4/5 rounded bg-zinc-200 motion-safe:animate-pulse dark:bg-zinc-800" />
-        <div className="h-3 w-3/5 rounded bg-zinc-200 motion-safe:animate-pulse dark:bg-zinc-800" />
-      </div>
+    <div className="flex items-center gap-3">
+      <SealLoader />
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">오늘도 해내는 중...</p>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApi } from "./useApi";
 import { useChatHistory } from "./useChatHistory";
@@ -11,13 +11,14 @@ import type { QueryRequest, RetrievalMode } from "../api/types";
 import {
   answerFromResponse,
   newId,
+  stoppedAnswerFromSession,
   withAnswerState,
   withQuestion,
   type AnswerState,
   type Conversation,
   type Message,
 } from "../lib/chat";
-import { saveCurrentId } from "../lib/history";
+import { saveCurrentId, type SaveResult } from "../lib/history";
 import { logWarning } from "../lib/logger";
 import { sessionViewOf } from "../lib/session";
 
@@ -47,8 +48,8 @@ export interface UseChatResult {
   isChecking: boolean;
   /** 보고 있는 대화가 서버에서 만료됐다. 다음 질문은 새 대화로 시작한다 */
   isExpired: boolean;
-  /** 마지막 저장이 성공했는지 */
-  isStorageOk: boolean;
+  /** 마지막 저장 결과 */
+  saveResult: SaveResult;
   /** 방금 지워서 실행 취소할 수 있는 대화 */
   lastDeleted: Conversation | undefined;
   /** 보고 있는 대화에 질문을 보낸다. 받는 중 · 확인 중이거나 빈 질문이면 보내지 않고 false */
@@ -70,12 +71,13 @@ export interface UseChatResult {
  * - 대화 하나 = 서버 세션 하나. 대화 id 가 곧 session_id 다
  * - 목록은 브라우저 저장소에 남긴다 (서버 기록에는 근거 · 오류 안내가 없다)
  * - 대화를 열거나 새로고침하면 서버 세션을 확인한다 (useSessionLookup · lib/session.ts).
- *   브라우저에 내용이 없으면 서버 기록으로 채우고, 만료됐으면 알린 뒤 다음 질문을 새 대화로 보낸다
+ *   브라우저에 내용이 없으면 서버 기록으로 채우고, 만료됐으면 알린 뒤 다음 질문을 새 대화로 보낸다.
+ *   받지 못하고 중지로 남은 마지막 답변은 서버가 기록해 두었으면 그 기록으로 채운다
  */
 export function useChat(): UseChatResult {
   const api = useApi();
   const storage = useStorage();
-  const { history, historyRef, isStorageOk, updateHistory } = useChatHistory();
+  const { history, historyRef, saveResult, updateHistory } = useChatHistory();
   const {
     lastDeleted,
     remove: removeConversation,
@@ -94,15 +96,48 @@ export function useChat(): UseChatResult {
   const controllerRef = useRef<AbortController | null>(null);
 
   const local = history.conversations.find((c) => c.id === history.currentId);
-  const { status, restored } = sessionViewOf(lookup, local);
+  // memo 된 대화 목록 · 대화 화면에 넘기므로 입력할 때마다 복원 대화를 새로 만들지 않는다
+  const { status, restored } = useMemo(() => sessionViewOf(lookup, local), [lookup, local]);
+  const conversations = useMemo(
+    () => (restored === undefined ? history.conversations : [restored, ...history.conversations]),
+    [restored, history.conversations],
+  );
   // 브라우저에도 서버에도 없는 대화는 새 대화 화면으로 연다
   const currentId = status === "missing" ? undefined : history.currentId;
   const restoredId = restored?.id;
   const activeId = ask.isPending ? ask.variables.request.sessionId : undefined;
+  const sessionInfo = lookup.state === "done" ? lookup.info : null;
 
   useEffect(() => {
     saveCurrentId(storage, currentId);
   }, [storage, currentId]);
+
+  // 서버 응답을 브라우저 저장본에 맞추는 일이라 렌더 중에 할 수 없다
+  useEffect(() => {
+    if (sessionInfo === null) {
+      return;
+    }
+    const conversation = historyRef.current.conversations.find(
+      (c) => c.id === sessionInfo.sessionId,
+    );
+    const filled = conversation && stoppedAnswerFromSession(conversation, sessionInfo);
+    if (!filled) {
+      return;
+    }
+    updateHistory(
+      (h) => ({
+        ...h,
+        conversations: withAnswerState(
+          h.conversations,
+          sessionInfo.sessionId,
+          filled.answerId,
+          { state: "done", answer: filled.answer },
+          sessionInfo.lastActiveAt,
+        ),
+      }),
+      true,
+    );
+  }, [sessionInfo, historyRef, updateHistory]);
 
   function finish(conversationId: string, answerId: string, next: AnswerState): void {
     updateHistory(
@@ -215,15 +250,14 @@ export function useChat(): UseChatResult {
   );
 
   return {
-    conversations:
-      restored === undefined ? history.conversations : [restored, ...history.conversations],
+    conversations,
     currentId,
     messages: (local ?? restored)?.messages ?? NO_MESSAGES,
     activeId,
     isBusy: activeId !== undefined,
     isChecking: status === "checking",
     isExpired: status === "expired",
-    isStorageOk,
+    saveResult,
     lastDeleted,
     send,
     stop,

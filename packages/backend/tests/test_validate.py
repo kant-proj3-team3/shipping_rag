@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import pytest
+from pydantic import ValidationError
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import Runnable
 
@@ -47,11 +48,18 @@ def _json(status="answered", source_ids=("S1",), answer="3일", reason="표 2") 
     )
 
 
-def _msg(text: str, usage: tuple[int, int] | None = (10, 5)) -> AIMessage:
-    m = AIMessage(content=text)
+def _msg(text: str, usage: tuple[int, int] | None = (10, 5)) -> dict:
+    """`with_structured_output(..., include_raw=True)` 가 돌려주는 모양을 흉내 낸다.
+
+    모델 원문(text)을 `ModelOutput` 으로 읽어서, 읽히면 parsed 에 넣고 못 읽으면 parsed=None + parsing_error 를 둔다.
+    """
+    raw = AIMessage(content=text)
     if usage is not None:
-        m.usage_metadata = {"input_tokens": usage[0], "output_tokens": usage[1], "total_tokens": sum(usage)}
-    return m
+        raw.usage_metadata = {"input_tokens": usage[0], "output_tokens": usage[1], "total_tokens": sum(usage)}
+    try:
+        return {"raw": raw, "parsed": ModelOutput.model_validate_json(text), "parsing_error": None}
+    except ValidationError as e:
+        return {"raw": raw, "parsed": None, "parsing_error": e}
 
 
 class FakeLLM(Runnable):

@@ -1,6 +1,6 @@
 // 이 파일은 scripts/gen-schemas.mjs 가 contracts/openapi.json 에서 만든다. 손으로 고치지 않는다 (npm run gen:api).
 // 서버 형식(snake_case) zod 스키마(*Raw), 화면 타입(camelCase), 서버 → 화면 변환 함수(to*), 화면 → 서버 요청 본문 함수(to*Body),
-// 요청 제약 상수(*_MAX_LENGTH · *_PATTERN).
+// 요청 제약 상수(*_MAX_LENGTH · *_PATTERN · *_MAXIMUM).
 
 import { z } from "zod";
 
@@ -349,6 +349,9 @@ export function toSessionInfo(raw: z.output<typeof sessionInfoRaw>): SessionInfo
     turns: (raw.turns ?? []).map((item) => toSessionTurn(item)),
   };
 }
+
+/** /session/{session_id} 의 limit 최댓값 (계약 maximum) */
+export const SESSION_LIMIT_MAXIMUM = 100;
 
 // 생성한 스키마가 openapi-typescript 의 타입(openapi.d.ts)과 같은지 컴파일 때 확인한다 (생성 스크립트의 실수를 잡는다)
 type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
