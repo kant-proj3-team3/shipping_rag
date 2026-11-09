@@ -9,10 +9,10 @@
 | 단위 | 이름 | 단계 | 상태 |
 |---|---|---|---|
 | A | 프롬프트·출력 스키마 | 1 | 완료(#5) |
-| B | 문맥 빌더 | 1 | 구현 완료(PR 대기) |
-| C | LangChain 체인 | 1 | 미착수 |
-| D | 출력 검증·출처 매핑 | 1 | 미착수 |
-| E | 오류 매핑 | 1 | 미착수 |
+| B | 문맥 빌더 | 1 | 완료(#7) |
+| C | LangChain 체인 | 1 | 완료(#9) |
+| D | 출력 검증·출처 매핑 | 1 | 완료(#13) |
+| E | 오류 매핑 | 1 | 구현 완료(PR 대기) |
 | F | Langfuse 트레이싱 | 2 | 미착수 |
 | G | Redis 세션 | 3 | 미착수 |
 | H | Redis 캐시 | 3 | 미착수 |
@@ -80,18 +80,31 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
 
 ### C. LangChain 체인
 
-- **목적**: 프롬프트와 `gpt-6-luna` 호출, 파싱을 연결한다.
+- **목적**: 프롬프트와 `gpt-6-luna` 호출, 출력 읽기를 연결한다.
 - **내용**
-  - `ChatOpenAI`(모델명은 환경변수) + 프롬프트 템플릿 + JSON 파서 구성.
+  - `ChatOpenAI`(모델명은 환경변수) + 메시지 구성 + 구조화 출력(`json_schema` strict) 구성.
   - timeout, 재시도 횟수, 최대 호출 수를 환경변수로 받는다. 재시도는 별도 요청이 아니라 같은 요청의 일부로 센다.
   - 호출마다 입력/출력 토큰 사용량을 읽어 돌려준다(확인 못 하면 `None`). 재시도 분은 합산한다.
   - 테스트에서 외부 호출 없이 쓸 수 있도록 LLM 객체를 주입받는 구조로 만든다.
 - **파일**: `src/backend/chain.py`, 의존성은 `pyproject.toml`에 추가(`langchain-openai` 등)
 - **완료 기준**
-  - [ ] 모의 LLM으로 정상·timeout·예외 경로가 모두 재현된다.
-  - [ ] 토큰 사용량이 없을 때 0이 아니라 `None`이다.
-  - [ ] 재시도 합산 토큰이 맞다.
-- **테스트**: 가짜 LLM(고정 응답, 지연, 예외).
+  - [x] 모의 LLM으로 정상·timeout·예외 경로가 모두 재현된다.
+  - [x] 토큰 사용량이 없을 때 0이 아니라 `None`이다.
+  - [x] 재시도 합산 토큰이 맞다.
+- **구현 메모**
+  - `AnswerChain.generate(question, context_text, variant, *, callbacks=None) -> ChainResult`. 모델을 한 번 부르는 한 시도는 LCEL 파이프 `RunnableLambda(_to_messages) | 구조화 모델 | RunnableLambda(_parse_reply)`이고, 바깥 루프가 시도 예산·timeout·재시도·토큰 합산을 맡는다. 구조 그림은 `chain.py` 모듈 docstring에 있다.
+  - 프롬프트는 `render_prompt`로 만들어 system/user 메시지로 그대로 보낸다. 시스템 프롬프트의 JSON 예시 중괄호가 템플릿 변수로 읽히지 않도록 `ChatPromptTemplate` 대신 `RunnableLambda`로 메시지를 만든다.
+  - **구조화 출력**: `ChatOpenAI.with_structured_output(ModelOutput, method="json_schema", strict=True, include_raw=True)`로 스키마를 API 차원에서 강제한다. 결과는 `{"raw", "parsed", "parsing_error"}`이고 원문·토큰은 `raw`에서 읽는다. **Chat Completions로 고정**한다(`use_responses_api=False`): Responses API는 strict 구조화 출력에서 응답 항목이 하나 더 붙는다는 보고가 있어 피했다(직접 호출에서는 재현되지 않았다). 스키마를 강제해도 `status=error`(스키마 enum에는 있으나 모델이 고를 수 없음), answered인데 출처 없음(`ModelOutput` 검증기), 출처가 이번 문맥에 있는지(D)는 코드가 계속 확인하므로 `parsed`가 `None`일 수 있고 그때는 재시도한다. 거부(refusal)도 같은 경로다. 파싱 실패 요약에는 모델이 쓴 내용을 넣지 않는다.
+  - 비용: 스키마가 입력에 붙어서 같은 질문의 입력 토큰이 약 20% 늘었다(직접 측정: 997 → 1,212). 형식 위반 재시도가 줄어드는지는 더 큰 표본이 필요하다.
+  - 텍스트 JSON 파서(`parse_model_output`)와 코드 블록 제거는 구조화 출력으로 바뀌면서 없앴다. 프롬프트의 출력 형식 설명(A)은 필드 의미를 알려 주는 역할로 그대로 둔다.
+  - 콜백: `callbacks`(예: Langfuse `CallbackHandler`)를 시도마다 `config`로 넘기고, 단계 이름(`generate-answer`/`render-prompt`/`parse-output`)과 `metadata`(`attempt`, `prompt_version`)를 붙인다. F 단계는 chain을 고치지 않고 콜백만 넘기면 된다. 기록 장애를 응답에서 격리하는 일은 F의 몫이다.
+  - 재시도를 `.with_retry()`로 하지 않는 이유: 호출 실패와 읽을 수 없는 출력을 같은 예산으로 세고, 시도마다 토큰을 합산해야 한다.
+  - 환경변수: `LLM_MODEL`(기본 `gpt-6-luna`), `LLM_TIMEOUT_S`(60), `LLM_MAX_RETRIES`(2), `LLM_MAX_CALLS`(3). 기본값은 **임시**이며 팀이 정한다. 시도 횟수 = `min(1 + MAX_RETRIES, MAX_CALLS)`.
+  - 재시도 대상은 호출 실패(timeout 포함)와 **읽을 수 없는 출력**(`parsed`가 `None`: 검증기 위반·거부 등)이다. 둘 다 같은 시도 예산을 쓴다. 문맥에 없는 `source_id` 같은 의미 검증은 D가 하고, D의 재생성은 `generate`를 다시 부르는 것이므로 그 호출의 토큰·시도는 호출자(E)가 합산한다.
+  - 끝내 응답을 못 받으면 `ModelTimeoutError`(`model_timeout`) / `ModelCallError`(`model_failed`)를 던진다(E가 `error_code`로 바꾼다). 응답은 받았지만 끝내 못 읽으면 예외가 아니라 `output=None` + `parse_error`로 돌려준다(D가 `output_invalid`로 처리). 예외 문구에 원본 오류 메시지를 넣지 않는다.
+  - 토큰: 응답을 받은 시도만 합산한다. 예외로 끝난 시도는 사용량을 알 수 없어 더하지 않는다. 응답 중 하나라도 사용량이 없으면 합계는 `None`이다.
+  - 모델 객체는 구조화 출력 결과(`{"raw","parsed","parsing_error"}`)를 돌려주는 Runnable을 주입받는다(`structured_model`로 만든다). 주입하지 않으면 `ChatOpenAI`를 만들어 구조화 출력을 입힌다(SDK 재시도는 끄고 체인이 재시도한다). **추론 강도와 temperature**: `LLM_REASONING_EFFORT`(`none`/`low`/`medium`/`high`/`xhigh`/`max`, 기본 `medium`)를 항상 보낸다. gpt-6-luna는 추론이 켜져 있으면 기본값(1) 외의 temperature를 400으로 거부하므로(실제 호출로 확인: `none`은 0·0.2·1 정상, `low`·`medium`·미설정은 1이 아닌 값 오류), 선택 환경변수 `LLM_TEMPERATURE`(0~2)는 `reasoning_effort=none`일 때만 보내고 그 외에는 보내지 않고 경고 로그를 남긴다. 평가처럼 재현성이 필요하면 `none` + `0`으로 고정한다.
+- **테스트**: `tests/test_chain.py`(가짜 LLM: 구조화 출력 모양의 고정 응답, 지연, 예외, 사용량 없음, 읽을 수 없는 출력).
 
 ### D. 출력 검증·출처 매핑
 
@@ -103,10 +116,19 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - `Citation`은 문맥 대응표에서 코드가 만든다. 모델이 쓴 문서명·페이지는 쓰지 않는다.
 - **파일**: `src/backend/validate.py`
 - **완료 기준**
-  - [ ] 잘못된 JSON, 필드 누락, 알 수 없는 status, 문맥에 없는 `source_id`를 각각 거부한다.
-  - [ ] 재생성이 제한 횟수를 넘지 않는다.
-  - [ ] 응답의 문서명·페이지가 항상 `Chunk` 값과 같다.
-- **테스트**: 위 실패 유형별 케이스, 재생성 후 성공 케이스.
+  - [x] 잘못된 JSON, 필드 누락, 알 수 없는 status는 C의 구조화 출력(`ModelOutput` 스키마)이, 문맥에 없는 `source_id`는 `validate_output`이 각각 거부한다.
+  - [x] 재생성이 제한 횟수를 넘지 않는다.
+  - [x] 응답의 문서명·페이지가 항상 `Chunk` 값과 같다.
+- **구현 메모**
+  - 검증 세 겹: ① 구문·타입, ② 필드 관계(answered는 출처 1개 이상, 중복 없음)는 `ModelOutput` 스키마가, ③ 출처 범위는 `validate.py`가 한다. 범위는 **이번 요청의 `ContextItem`** 만 기준이다.
+  - 출처 정책: 범위 밖 `source_id`는 status와 무관하게 항상 거부한다. `abstained`·`needs_clarification`의 `source_ids`는 범위 안이면 허용한다(자료 충돌로 보류할 때 양쪽 자료를 근거로 들 수 있다). `answered`는 1개 이상 필수다.
+  - `Citation.page`가 정수 하나라서, 여러 페이지에 걸친 청크는 **페이지마다 Citation을 하나씩** 만든다(같은 `source_id`에 page만 다름). 첫 페이지만 남기면 나머지가 사라지기 때문이다. 계약을 바꾸지 않은 임시 선택이며, 다르게 하려면 팀과 정한다.
+  - `generate_validated(chain, question, context, variant, *, callbacks, max_regen)`가 생성→검증→재생성을 한다. 상한은 두 가지다: 재생성 횟수(`OUTPUT_MAX_REGENERATIONS`, 기본 1, **임시**)와 요청 전체 모델 호출 수(`LLM_MAX_CALLS`, 체인 재시도·재생성 합). 먼저 닿는 쪽에서 멈춘다. 이를 위해 `AnswerChain.generate`에 `attempt_limit` 인자를 추가했다.
+  - 끝내 통과하지 못하면 예외가 아니라 `ValidationOutcome(answer=None, failure=...)`로 돌려준다. E가 `output_invalid`로 바꾼다. `failure`에는 모델 원문을 넣지 않는다.
+  - 토큰·호출 수는 모든 호출의 합이다. 하나라도 사용량을 모르면 `None`이다. 호출 실패(`ModelTimeoutError`/`ModelCallError`)는 그대로 던지며, 재생성 도중 실패하면 앞선 호출의 토큰은 응답에 담지 못한다(확인된 값만 집계).
+  - 빈 문맥으로는 호출하지 않는다(`ValueError`). 빈 문맥은 E가 모델 없이 `abstained`로 처리한다.
+  - 이 검증은 문장이 그 자료로 지지되는지는 확인하지 못한다(J의 평가와 사람의 대조 몫).
+- **테스트**: `tests/test_validate.py`(출처 범위, status별 출처 허용, Citation 매핑·여러 페이지, 재생성 한도·호출 상한·토큰 합산).
 
 ### E. 오류 매핑과 QAService 조립
 
@@ -119,10 +141,18 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 세션 기록은 G 전까지 목업 저장소를 쓴다. `error`는 기록하지 않는다.
 - **파일**: `src/backend/qa.py`
 - **완료 기준**
-  - [ ] 정상 / 빈 검색 / 근거 부족(abstained) / 되묻기 / 모델 오류 / 출력 오류 / 입력 오류가 각각 테스트로 구분된다.
-  - [ ] `status=error`는 코드만 만든다(모델 출력에서 올 수 없다).
-  - [ ] 실패한 요청도 `latency_ms`가 채워진다.
-  - [ ] 기존 목업과 같은 `QAService` 인터페이스를 만족한다(`runtime_checkable` 검사).
+  - [x] 정상 / 빈 검색 / 근거 부족(abstained) / 되묻기 / 모델 오류 / 출력 오류 / 입력 오류가 각각 테스트로 구분된다.
+  - [x] `status=error`는 코드만 만든다(모델 출력에서 올 수 없다).
+  - [x] 실패한 요청도 `latency_ms`가 채워진다.
+  - [x] 기존 목업과 같은 `QAService` 인터페이스를 만족한다(`runtime_checkable` 검사).
+- **구현 메모**
+  - `BackendQAService(retriever, chain, sessions, *, default_mode, k, variant)`. 협력 객체는 모두 주입받는다. 진입점 `create_qa_service`는 아직 목업을 돌려준다(전환은 I 단계).
+  - 흐름: 검색 → `build_context`(예산은 `context_max_tokens()`) → 빈 문맥이면 모델 없이 `abstained` → `generate_validated` → 응답. 예산 때문에 문맥이 빈 경우도 같은 abstained이고 `reason`만 다르다.
+  - 예외 매핑은 `error_code_for`가 한다. 목록에 없는 예외(`IngestError` 포함)는 `internal`이다. 사용자 문구·`reason`은 코드별 고정 문자열이고, 예외 메시지·스택은 서버 로그(`logger.warning`)에만 남긴다. `CancelledError` 같은 BaseException은 잡지 않는다.
+  - 토큰: 정상·`output_invalid`는 확인된 합계(모르면 `None`), 모델 호출이 예외로 끝난 요청과 모델을 부르지 않은 요청은 `None`이다. `cost_usd`·`trace_id`는 `None`(F 이후 채운다).
+  - `final_context`: 문맥을 만든 뒤의 응답(정상·보류·모델 오류·출력 오류)에는 모델에 전달한(하려던) 문맥을 담고, 검색 단계 오류와 빈 문맥은 빈 목록이다. 평가기가 오류 응답의 문맥도 볼 수 있게 한 임시 선택이다.
+  - 세션: `append(session_id, turn)`을 가진 저장소를 주입받는다(G 전까지 `InMemorySessionStore`). `error`는 기록하지 않고, 기록이 실패해도 답변은 그대로 나간다. `latency_ms`는 기록 직전까지의 시간이다.
+  - 검색 개수 `k`(기본 5)와 기본 모드(`hybrid`)는 목업과 같은 **임시** 값이다. 환경변수는 아직 만들지 않았다(H·I에서 정한다).
 - **테스트**: `tests/test_qa.py`(목업 Retriever + 가짜 LLM, `pytest-asyncio` 또는 `asyncio.run`).
 
 ---

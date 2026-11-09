@@ -39,9 +39,26 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 
 ## 주요 설계 결정
 
-- 아직 없음(목업 단계). 프롬프트 구성, 토큰 예산, 캐시 키 구성, Langfuse 기록 단위를 정하면 여기에 기록한다.
+- 모델 호출(`chain.py`): 모델은 `json_schema`(strict) 구조화 출력으로 `ModelOutput` 스키마를 강제받는다(Chat Completions 고정). 재시도는 별도 요청이 아니라 같은 요청의 일부다. 호출 실패와 읽을 수 없는 출력(`parsed=None`)을 같은 시도 예산으로 다시 시도하고, 토큰은 응답을 받은 시도만 합산한다(하나라도 사용량이 없으면 `None`). 끝내 응답이 없으면 `ModelTimeoutError`/`ModelCallError`, 응답은 있으나 못 읽으면 `ChainResult.output=None`으로 돌려주고 `output_invalid` 판단은 검증 단계가 한다. 스키마가 입력 토큰을 약 20% 늘린다.
+- 출력 검증(`validate.py`): 출처는 모델이 쓴 문서명·페이지가 아니라 이번 요청의 문맥(`Chunk`)에서 코드가 채운다. 범위 밖 `source_id`는 항상 거부하고, `abstained`의 출처는 범위 안이면 허용한다. 여러 페이지에 걸친 청크는 페이지마다 `Citation`을 만든다. 검증이 끝내 실패하면 예외 없이 실패 이유를 돌려주고 `output_invalid`로 바꾸는 일은 QA 서비스가 한다.
+- 아직 정하지 않은 것: 캐시 키 구성, Langfuse 기록 단위. 정하면 여기에 기록한다.
 - `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 둘 다 `REDIS_URL`을 읽는다.
 - 캐시 키의 `index_name`+`embedder_id`는 `retriever.index`에서 읽는다(`create_qa_service`가 `IndexManifest`를 따로 받지 않는다).
+
+## 설정 (환경변수)
+
+| 이름 | 기본값 | 설명 |
+|---|---|---|
+| `OPENAI_API_KEY` | (없음) | `ChatOpenAI`가 읽는다. 커밋하지 않는다 |
+| `LLM_MODEL` | `gpt-6-luna` | 생성 모델 |
+| `LLM_TIMEOUT_S` | `60` | 모델 호출 1회 timeout(초) |
+| `LLM_MAX_RETRIES` | `2` | 첫 호출 뒤 추가 시도 횟수 |
+| `LLM_REASONING_EFFORT` | `medium` | 추론 강도(none, low, medium, high, xhigh, max 중 하나). 잘못된 값이면 기본값 |
+| `LLM_TEMPERATURE` | (비움) | `none`일 때만 적용되는 temperature(0~2). 추론이 켜져 있으면 모델이 거부하므로 보내지 않고 경고를 남긴다. 재현성이 필요하면 `LLM_REASONING_EFFORT=none`과 `0`으로 고정 |
+| `LLM_MAX_CALLS` | `3` | 한 요청의 모델 호출 상한(체인 재시도와 검증 재생성의 합). 체인 시도 횟수는 `min(1+MAX_RETRIES, MAX_CALLS)` |
+| `OUTPUT_MAX_REGENERATIONS` | `1` | 출력 검증에 실패했을 때 다시 생성하는 최대 횟수. 0이면 재생성하지 않는다 |
+
+기본값은 임시이며 팀이 정하면 환경변수로 바꾼다.
 
 ## 테스트
 
