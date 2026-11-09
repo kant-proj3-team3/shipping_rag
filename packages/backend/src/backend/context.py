@@ -58,10 +58,11 @@ def _page_label(chunk: Chunk) -> str:
 
 
 def _header(source_id: str, chunk: Chunk) -> str:
-    """출처 표기. 여러 페이지에 걸친 청크는 범위를 그대로 남긴다."""
-    name = chunk.file_name
-    label = f"{chunk.title} ({name})" if chunk.title else name
-    return f"[{source_id}] {label} {_page_label(chunk)}"
+    """출처 표기(파일명·페이지). 여러 페이지에 걸친 청크는 범위를 그대로 남긴다.
+
+    문서 제목은 넣지 않는다: 청커가 본문 첫 줄에 `[제목 > 섹션 > 소제목]`을 이미 붙인다.
+    """
+    return f"[{source_id}] {chunk.file_name} {_page_label(chunk)}"
 
 
 def _render_block(source_id: str, chunk: Chunk) -> str:

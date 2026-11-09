@@ -91,11 +91,11 @@ def test_multi_page_chunk_keeps_page_range():
     assert "p.7" in out.text and "p.7-" not in out.text
 
 
-def test_header_has_title_and_file_name_and_falls_back_without_title():
-    with_title = build_context([_rc(1, title="보관료 안내")], max_tokens=10_000).text
-    assert "[S1] 보관료 안내 (IS01.pdf) p.1" in with_title
-    no_title = build_context([_rc(1, title=None)], max_tokens=10_000).text
-    assert "[S1] IS01.pdf p.1" in no_title
+def test_header_has_file_name_and_page_but_not_title():
+    # 제목은 청커가 본문에 이미 넣으므로 헤더에서 반복하지 않는다
+    for title in ("보관료 안내", None):
+        text = build_context([_rc(1, "본문", title=title)], max_tokens=10_000).text
+        assert text == "[S1] IS01.pdf p.1\n본문"
 
 
 # ── 순서 / 일관성 ──
