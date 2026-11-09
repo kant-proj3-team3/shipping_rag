@@ -88,8 +88,9 @@ export function ChatView({
   if (messages.length === 0) {
     return <EmptyState onPickExample={onPickExample} />;
   }
+  // relative 가 없으면 안쪽 절대 위치 요소(sr-only 라벨)가 이 영역에 잘리지 않고 문서 높이를 늘려 페이지 전체가 스크롤된다
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label="대화">
+    <div className="relative min-h-0 flex-1 overflow-y-auto" role="region" aria-label="대화">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
         {messages.map((m) => (
           <div key={m.id} ref={m === last ? lastRef : undefined} className="scroll-mt-6">
