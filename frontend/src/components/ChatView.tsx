@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { AssistantMessage } from "./messages/AssistantMessage";
 import { UserMessage } from "./messages/UserMessage";
@@ -30,33 +30,35 @@ interface EmptyStateProps {
 
 function EmptyState({ onPickExample }: EmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto p-6 text-center">
-      <div>
-        <h2 className="text-xl font-semibold">무엇이 궁금하신가요?</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          부산–LA 일반 건화물의 예약 · 서류 절차와 보관료를 물으면 자료집을 근거로 결론 · 근거 ·
-          출처를 답합니다.
-        </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 text-center">
+      {/* justify-center 로 가운데에 두면 화면이 낮을 때 넘친 위쪽을 스크롤로 볼 수 없어 my-auto 를 쓴다 */}
+      <div className="my-auto flex flex-col items-center gap-6">
+        <div>
+          <h2 className="text-xl font-semibold">무엇이 궁금하신가요?</h2>
+          <p className="mt-2 text-sm text-zinc-500">
+            부산–LA 일반 건화물의 예약 · 서류 절차와 보관료를 물으면 자료집을 근거로 결론 · 근거 ·
+            출처를 답합니다.
+          </p>
+        </div>
+        <ul className="flex w-full max-w-md flex-col gap-2">
+          {EXAMPLES.map((text) => (
+            <li key={text}>
+              <button
+                type="button"
+                onClick={() => onPickExample(text)}
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                {text}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="flex w-full max-w-md flex-col gap-2">
-        {EXAMPLES.map((text) => (
-          <li key={text}>
-            <button
-              type="button"
-              onClick={() => onPickExample(text)}
-              className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              {text}
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
 
-/** 질문 · 답변 목록. 질문을 보내면 맨 아래로, 답이 오면 그 답의 처음(결론)이 보이게 내린다 */
-export function ChatView({
+function ChatViewInner({
   messages,
   isChecking,
   isExpired,
@@ -88,8 +90,10 @@ export function ChatView({
   if (messages.length === 0) {
     return <EmptyState onPickExample={onPickExample} />;
   }
+  // relative 가 없으면 안쪽 절대 위치 요소(sr-only 라벨)가 이 영역에 잘리지 않고 문서 높이를 늘려 페이지 전체가 스크롤된다.
+  // role=log 는 새로 붙는 메시지만 스크린 리더에 알린다 (답변 도착 · 오류. 지난 대화를 열 때는 다시 읽지 않는다)
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label="대화">
+    <div className="relative min-h-0 flex-1 overflow-y-auto" role="log" aria-label="대화">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
         {messages.map((m) => (
           <div key={m.id} ref={m === last ? lastRef : undefined} className="scroll-mt-6">
@@ -101,10 +105,7 @@ export function ChatView({
           </div>
         ))}
         {isExpired ? (
-          <p
-            role="status"
-            className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
-          >
+          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             서버에서 만료된 대화입니다. 내용은 그대로 볼 수 있고, 다음 질문은 새 대화로 시작합니다.
           </p>
         ) : null}
@@ -113,3 +114,9 @@ export function ChatView({
     </div>
   );
 }
+
+/**
+ * 질문 · 답변 목록. 질문을 보내면 맨 아래로, 답이 오면 그 답의 처음(결론)이 보이게 내린다.
+ * 대화가 길 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
+ */
+export const ChatView = memo(ChatViewInner);

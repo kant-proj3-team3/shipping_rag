@@ -2,6 +2,8 @@ import { HistoryList } from "./HistoryList";
 import { ServerStatus } from "./ServerStatus";
 import type { HealthState } from "../hooks/useHealth";
 import { titleOf, type Conversation } from "../lib/chat";
+import type { SaveResult } from "../lib/history";
+import { SAVE_WARNING_TEXT } from "../lib/labels";
 
 interface SidebarProps {
   health: HealthState;
@@ -15,8 +17,8 @@ interface SidebarProps {
   /** 방금 지운 대화 (실행 취소 안내) */
   lastDeleted: Conversation | undefined;
   onUndoRemove: () => void;
-  /** 대화 목록 저장이 성공했는지. false 면 경고를 보인다 */
-  isStorageOk: boolean;
+  /** 대화 목록의 마지막 저장 결과. saved 가 아니면 경고를 보인다 */
+  saveResult: SaveResult;
 }
 
 /** 왼쪽 사이드바: 새 대화 · 대화 목록 · 서버 상태 */
@@ -30,7 +32,7 @@ export function Sidebar({
   onRemove,
   lastDeleted,
   onUndoRemove,
-  isStorageOk,
+  saveResult,
 }: SidebarProps) {
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
@@ -72,9 +74,9 @@ export function Sidebar({
             </button>
           </div>
         ) : null}
-        {!isStorageOk ? (
+        {saveResult !== "saved" ? (
           <p role="status" className="text-xs text-amber-700 dark:text-amber-400">
-            대화 목록을 저장하지 못했습니다 (브라우저 저장소를 쓸 수 없음)
+            {SAVE_WARNING_TEXT[saveResult]}
           </p>
         ) : null}
         <ServerStatus state={health} />

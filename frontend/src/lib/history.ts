@@ -21,6 +21,9 @@ const SHRINK_RATIO = 0.8;
 /** 저장소 용량 초과 예외 이름. NS_ERROR_DOM_QUOTA_REACHED 는 구버전 Firefox 가 쓴다 */
 const QUOTA_ERROR_NAMES: readonly string[] = ["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"];
 
+/** 저장 결과. trimmed 는 용량이 모자라 오래된 대화 일부를 저장본에서 뺀 경우다 */
+export type SaveResult = "saved" | "trimmed" | "failed";
+
 /** 불러온 대화 목록 */
 export interface LoadedHistory {
   /** 최신 활동순 */
@@ -86,22 +89,31 @@ function readConversation(value: unknown): Conversation[] {
   return messages.length > 0 ? [{ ...parsed.data, messages }] : [];
 }
 
-function readList(raw: string | null): unknown[] {
+/** 저장본의 대화 목록. 저장본이 없거나 깨졌거나 다른 버전이면 undefined */
+function readList(raw: string | null): unknown[] | undefined {
   if (raw === null) {
-    return [];
+    return undefined;
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
     logWarning("대화 목록 저장본이 깨져 있어 버린다", e);
-    return [];
+    return undefined;
   }
   return isObject(parsed) &&
     parsed.version === HISTORY_VERSION &&
     Array.isArray(parsed.conversations)
     ? parsed.conversations
-    : [];
+    : undefined;
+}
+
+function readConversations(list: unknown[]): Conversation[] {
+  const conversations = sortByRecent(list.flatMap(readConversation));
+  if (conversations.length < list.length) {
+    logWarning(`깨진 대화 ${list.length - conversations.length}개를 버렸다`);
+  }
+  return conversations;
 }
 
 function isQuotaError(e: unknown): boolean {
@@ -116,11 +128,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 export function loadHistory(storage: KeyValueStorage): LoadedHistory {
   const raw = readItem(storage, HISTORY_STORAGE_KEY, "대화 목록");
   const current = readItem(storage, CURRENT_STORAGE_KEY, "보고 있던 대화");
-  const list = readList(raw);
-  const conversations = sortByRecent(list.flatMap(readConversation));
-  if (conversations.length < list.length) {
-    logWarning(`깨진 대화 ${list.length - conversations.length}개를 버렸다`);
-  }
+  const conversations = readConversations(readList(raw) ?? []);
   const currentId = current !== null && SESSION_ID_PATTERN.test(current) ? current : undefined;
   return { conversations, currentId };
 }
@@ -128,23 +136,25 @@ export function loadHistory(storage: KeyValueStorage): LoadedHistory {
 /**
  * 대화 목록을 저장한다 (최신순 최대 MAX_CONVERSATIONS 개). 용량이 넘치면 오래된 대화부터 줄여 다시 쓴다.
  *
- * @returns 저장했으면 true (일부를 줄였어도 true), 저장할 수 없으면 false
+ * @returns 그대로 저장했으면 saved, 일부를 줄였으면 trimmed, 저장할 수 없으면 failed
  */
-export function saveHistory(storage: KeyValueStorage, conversations: Conversation[]): boolean {
+export function saveHistory(storage: KeyValueStorage, conversations: Conversation[]): SaveResult {
   let keep = sortByRecent(conversations).slice(0, MAX_CONVERSATIONS);
+  let result: SaveResult = "saved";
   for (;;) {
     try {
       storage.setItem(
         HISTORY_STORAGE_KEY,
         JSON.stringify({ version: HISTORY_VERSION, conversations: keep }),
       );
-      return true;
+      return result;
     } catch (e) {
       if (!isQuotaError(e) || keep.length <= 1) {
         logWarning("대화 목록을 저장하지 못했다", e);
-        return false;
+        return "failed";
       }
       keep = keep.slice(0, Math.floor(keep.length * SHRINK_RATIO));
+      result = "trimmed";
     }
   }
 }
@@ -181,4 +191,13 @@ export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]):
   const isCurrentListed = localById.has(local.currentId ?? "");
   const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);
   return { conversations, currentId: isGone ? undefined : local.currentId };
+}
+
+/**
+ * 저장 직전에 저장본을 다시 읽어 합친다. 저장은 목록 전체를 덮어쓰므로, 다른 탭의 변경을 받기 전에 저장해도 그 변경을 지우지 않게 한다.
+ * 저장본이 없거나 읽을 수 없으면 그대로 돌려준다 (빈 목록과 합치면 이 탭의 대화를 지운 것으로 보게 된다)
+ */
+export function mergeStoredHistory(storage: KeyValueStorage, local: LoadedHistory): LoadedHistory {
+  const list = readList(readItem(storage, HISTORY_STORAGE_KEY, "대화 목록"));
+  return list === undefined ? local : mergeFromOtherTab(local, readConversations(list));
 }
