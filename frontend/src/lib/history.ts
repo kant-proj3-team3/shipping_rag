@@ -89,22 +89,31 @@ function readConversation(value: unknown): Conversation[] {
   return messages.length > 0 ? [{ ...parsed.data, messages }] : [];
 }
 
-function readList(raw: string | null): unknown[] {
+/** 저장본의 대화 목록. 저장본이 없거나 깨졌거나 다른 버전이면 undefined */
+function readList(raw: string | null): unknown[] | undefined {
   if (raw === null) {
-    return [];
+    return undefined;
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
     logWarning("대화 목록 저장본이 깨져 있어 버린다", e);
-    return [];
+    return undefined;
   }
   return isObject(parsed) &&
     parsed.version === HISTORY_VERSION &&
     Array.isArray(parsed.conversations)
     ? parsed.conversations
-    : [];
+    : undefined;
+}
+
+function readConversations(list: unknown[]): Conversation[] {
+  const conversations = sortByRecent(list.flatMap(readConversation));
+  if (conversations.length < list.length) {
+    logWarning(`깨진 대화 ${list.length - conversations.length}개를 버렸다`);
+  }
+  return conversations;
 }
 
 function isQuotaError(e: unknown): boolean {
@@ -119,11 +128,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 export function loadHistory(storage: KeyValueStorage): LoadedHistory {
   const raw = readItem(storage, HISTORY_STORAGE_KEY, "대화 목록");
   const current = readItem(storage, CURRENT_STORAGE_KEY, "보고 있던 대화");
-  const list = readList(raw);
-  const conversations = sortByRecent(list.flatMap(readConversation));
-  if (conversations.length < list.length) {
-    logWarning(`깨진 대화 ${list.length - conversations.length}개를 버렸다`);
-  }
+  const conversations = readConversations(readList(raw) ?? []);
   const currentId = current !== null && SESSION_ID_PATTERN.test(current) ? current : undefined;
   return { conversations, currentId };
 }
@@ -186,4 +191,13 @@ export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]):
   const isCurrentListed = localById.has(local.currentId ?? "");
   const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);
   return { conversations, currentId: isGone ? undefined : local.currentId };
+}
+
+/**
+ * 저장 직전에 저장본을 다시 읽어 합친다. 저장은 목록 전체를 덮어쓰므로, 다른 탭의 변경을 받기 전에 저장해도 그 변경을 지우지 않게 한다.
+ * 저장본이 없거나 읽을 수 없으면 그대로 돌려준다 (빈 목록과 합치면 이 탭의 대화를 지운 것으로 보게 된다)
+ */
+export function mergeStoredHistory(storage: KeyValueStorage, local: LoadedHistory): LoadedHistory {
+  const list = readList(readItem(storage, HISTORY_STORAGE_KEY, "대화 목록"));
+  return list === undefined ? local : mergeFromOtherTab(local, readConversations(list));
 }
