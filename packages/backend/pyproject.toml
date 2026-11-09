@@ -3,7 +3,13 @@ name = "backend"
 version = "0.1.0"
 description = "FastAPI 라우터, QA 서비스, 세션, 답변 평가"
 requires-python = ">=3.12"
-dependencies = ["common", "pydantic>=2.7", "fastapi>=0.110"]
+dependencies = [
+    "common",
+    "pydantic>=2.7",
+    "fastapi>=0.110",
+    "langchain-openai>=1.7.4",
+    "langchain-core>=1.7.6",
+]
 
 [build-system]
 requires = ["hatchling"]
