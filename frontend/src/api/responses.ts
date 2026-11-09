@@ -9,12 +9,7 @@ import {
   sessionInfoSchema,
   validationErrorSchema,
 } from "./schemas";
-import {
-  ERROR_HTTP_STATUS,
-  type HealthResponse,
-  type QueryResponse,
-  type SessionInfo,
-} from "./types";
+import type { HealthResponse, QueryResponse, SessionInfo } from "./types";
 
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404; // 계약 HTTP_SESSION_NOT_FOUND
@@ -32,14 +27,6 @@ export interface HttpResult {
   status: number;
   /** JSON 으로 읽은 본문. JSON 이 아니면 undefined */
   body: unknown;
-}
-
-/** 계약이 정한 HTTP 상태. 오류 코드가 매핑에 없으면(ingest_failed 등) undefined → 계약 위반 */
-function expectedHttpStatus(response: QueryResponse): number | undefined {
-  if (response.status !== "error") {
-    return HTTP_OK;
-  }
-  return response.errorCode === null ? undefined : ERROR_HTTP_STATUS[response.errorCode];
 }
 
 /** 기대한 본문을 받지 못함: 본문이 없으면 서버에 닿지 못한 것(network), 다른 JSON 이면 계약 위반(bad_response) */
@@ -78,9 +65,10 @@ export function readHealth({ status, body }: HttpResult): HealthResponse {
 }
 
 /**
- * POST /query 응답을 읽는다. 서버가 status="error" 로 답했으면(400 · 5xx + 본문) 그대로 돌려준다.
+ * POST /query 응답을 읽는다. 서버가 status="error" 로 답했으면 그대로 돌려준다.
+ * 오류별 HTTP 상태는 서버의 일이라 확인하지 않고, 본문이 계약에 맞으면 서버가 준 대로 보여 준다.
  *
- * @throws RequestError 422 거절, 서버에 닿지 못함(network), 본문 · HTTP 상태가 계약과 다름(bad_response)
+ * @throws RequestError 422 거절, 서버에 닿지 못함(network), 본문이 계약과 다름(bad_response)
  */
 export function readQueryResponse({ status, body }: HttpResult): QueryResponse {
   if (status === HTTP_UNPROCESSABLE) {
@@ -93,15 +81,7 @@ export function readQueryResponse({ status, body }: HttpResult): QueryResponse {
     }
     throw new RequestError("bad_response", "질문 응답이 계약과 다릅니다", { cause: parsed.error });
   }
-  const response = parsed.data;
-  const expected = expectedHttpStatus(response);
-  if (status !== expected) {
-    throw new RequestError(
-      "bad_response",
-      `응답 상태 ${response.status}(${response.errorCode ?? "-"})는 HTTP ${expected ?? "?"} 여야 하는데 ${status} 로 왔습니다`,
-    );
-  }
-  return response;
+  return parsed.data;
 }
 
 /**
