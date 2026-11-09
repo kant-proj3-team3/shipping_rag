@@ -17,6 +17,7 @@ dev = [
     "pytest>=8",
     "httpx>=0.27",
     "pypdf>=4",
+    "fakeredis>=2.20",   # backend 세션 테스트용 메모리 Redis (서비스 이미지에는 넣지 않는다)
 ]
 
 [build-system]

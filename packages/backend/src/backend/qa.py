@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Sequence
@@ -114,7 +115,7 @@ def error_code_for(exc: BaseException) -> ErrorCode:
 
 
 class SessionRecorder(Protocol):
-    """턴을 기록하는 저장소. G 단계 전까지는 목업 저장소, 이후 Redis 구현이 들어온다."""
+    """턴을 기록하는 저장소(목업 메모리 저장소 또는 `RedisSessionStore`). 블로킹 호출이어도 된다: 서비스가 스레드로 부른다."""
 
     def append(self, session_id: str, turn: SessionTurn) -> None: ...
 
@@ -205,7 +206,9 @@ class BackendQAService:
             if context.is_empty:  # 모델을 호출하지 않는다
                 reason = _EMPTY_REASON if not retrieved.chunks else _EMPTY_BUDGET_REASON
                 trace.annotate(model_called=False)
-                return self._finish(request, ctx, mode, meta(), AnswerStatus.ABSTAINED, _EMPTY_ANSWER, reason, [], [])
+                return await self._finish(
+                    request, ctx, mode, meta(), AnswerStatus.ABSTAINED, _EMPTY_ANSWER, reason, [], []
+                )
 
             outcome = await generate_validated(
                 self._chain, request.question, context, self._variant, callbacks=trace.callbacks() or None
@@ -230,7 +233,7 @@ class BackendQAService:
             return error(ErrorCode.OUTPUT_INVALID, outcome.input_tokens, outcome.output_tokens)
 
         validated: ValidatedAnswer = outcome.answer
-        return self._finish(
+        return await self._finish(
             request,
             ctx,
             mode,
@@ -242,7 +245,7 @@ class BackendQAService:
             context.items,
         )
 
-    def _finish(
+    async def _finish(
         self,
         request: QueryRequest,
         ctx: RequestContext,
@@ -264,18 +267,17 @@ class BackendQAService:
         )
         if request.session_id:
             try:
-                self._sessions.append(
-                    request.session_id,
-                    SessionTurn(
-                        request_id=ctx.request_id,
-                        asked_at=datetime.now(UTC),
-                        question=request.question,
-                        retrieval_mode=mode,
-                        status=status,
-                        answer=answer,
-                        citations=list(citations),
-                    ),
+                turn = SessionTurn(
+                    request_id=ctx.request_id,
+                    asked_at=datetime.now(UTC),
+                    question=request.question,
+                    retrieval_mode=mode,
+                    status=status,
+                    answer=answer,
+                    citations=list(citations),
                 )
+                # 저장소(Redis)가 동기 호출이라 이벤트 루프 밖에서 부른다. 멈춰도 다른 요청을 막지 않는다.
+                await asyncio.to_thread(self._sessions.append, request.session_id, turn)
             except Exception:  # noqa: BLE001 - 기록 실패가 답변 실패가 되지 않게 한다
                 logger.warning("세션 기록 실패 request_id=%s", ctx.request_id, exc_info=True)
         return QAResult(response=resp, final_context=list(items))

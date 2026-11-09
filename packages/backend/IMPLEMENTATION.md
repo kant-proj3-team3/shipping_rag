@@ -14,7 +14,8 @@
 | D | 출력 검증·출처 매핑 | 1 | 완료(#13) |
 | E | 오류 매핑 | 1 | 완료(#15) |
 | F | Langfuse 트레이싱 | 2 | 구현 완료(PR 대기) |
-| G | Redis 세션 | 3 | 미착수 |
+| G | Redis 세션 | 3 | 구현 완료(PR 대기) |
+| G2 | PostgreSQL 메시지 영구 저장 (계약 변경 동반) | 3 | 미착수(계약 결정 대기) |
 | H | Redis 캐시 | 3 | 미착수 |
 | I | 라우터·`create_*` 진입점 | 4 | 미착수 |
 | J | 답변 평가기 | 5 | 미착수 |
@@ -202,10 +203,46 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - Redis 장애 시 `/query`는 세션 기록만 건너뛰고 응답한다(기록 실패가 답변 실패가 되지 않게 한다).
 - **파일**: `src/backend/session.py`
 - **완료 기준**
-  - [ ] 목업과 같은 `SessionService` 인터페이스를 만족한다.
-  - [ ] limit·turn_count·순서·만료가 테스트로 확인된다.
-  - [ ] `error`는 기록되지 않는다.
-- **테스트**: `fakeredis` 또는 compose의 Redis로 통합 테스트(어느 쪽을 쓰는지 여기에 적는다).
+  - [x] 목업과 같은 `SessionService` 인터페이스를 만족한다(`RedisSessionService`, `isinstance` 검사).
+  - [x] limit·turn_count·순서·만료가 테스트로 확인된다.
+  - [x] `error`는 기록되지 않는다(QAService가 error 응답은 기록하지 않고, Redis 저장소로 통합 테스트).
+- **구현 메모**
+  - 구조: 세션 하나가 키 두 개(`rag:session:{id}:meta` hash, `rag:session:{id}:turns` list), 같은 TTL. 기록은 MULTI/EXEC 한 번으로 두 키를 갱신하고 TTL을 다시 건다. 조회는 TTL을 늘리지 않는다. 설계 이유와 장애 처리는 `session.py` 모듈 docstring과 README.
+  - `turn_count`는 meta의 카운터다. 보관 상한(`SESSION_MAX_TURNS`)으로 오래된 턴이 잘려도 전체 개수는 유지된다. `expires_at = last_active_at + TTL`.
+  - 장애: 기록 실패는 QAService가 삼키고(응답은 그대로), 조회 실패는 `None`(404)으로 바꾸지 않고 예외를 낸다. 이 경우 HTTP는 FastAPI 기본 500이며 계약에 맞는 `ApiError` 코드는 없다(필요하면 계약 변경 사항).
+  - 동기 `redis` 클라이언트를 쓰고 `asyncio.to_thread`로 부른다. 그래서 `qa.py`의 `_finish`가 `async`가 됐다(기록 한 줄만 바뀜. `SessionRecorder` 프로토콜은 그대로라 목업 저장소도 동작한다). 멈춘 Redis가 이벤트 루프를 막지 않는지는 테스트로 확인한다(`to_thread`를 빼면 실패함을 확인).
+  - 환경변수: `REDIS_URL`, `REDIS_TIMEOUT_S`(2), `SESSION_TTL_SECONDS`(86400), `SESSION_MAX_TURNS`(200). 기본값은 **임시**이며 팀이 정한다.
+  - 진입점 전환은 하지 않았다. `create_session_store()`가 저장소를 만들고, `create_qa_service`와 `create_session_service`가 이를 쓰게 하는 일은 I 단계다(둘이 서로를 인자로 받지 않으므로 각자 `create_session_store()`로 같은 Redis를 본다).
+  - 의존성: `redis>=5`(backend), 테스트용 `fakeredis`는 **루트** `pyproject.toml`의 dev 그룹에 넣었다(CI가 `uv sync --locked`로 루트 dev 그룹만 설치하므로. 서비스 이미지에는 들어가지 않는다).
+- **테스트**: `tests/test_session.py` — `fakeredis`(메모리)로 구조·순서·limit·TTL 갱신·조회 시 TTL 불변·만료·상한·읽을 수 없는 턴·잘못된 ID·bytes 클라이언트·QAService 연결·Redis 장애·이벤트 루프 비차단. 실제 Redis(compose)로도 한 번 확인했다: 기록·조회·TTL 86400·한글 왕복·같은 세션에 병렬 20건(전부 기록)·상한.
+
+### G2. PostgreSQL 메시지 영구 저장
+
+- **목적**: 질의응답 메시지를 PostgreSQL에 영구 저장한다. Redis 세션(G)의 TTL·보관 상한과 무관하게 이력이 남게 한다.
+- **전제**: **계약 변경을 동반한다.** `packages/common`·`contracts` 변경은 사람이 계약 변경 PR로 올린다(에이전트는 제안만 한다). 인터페이스를 바꿔야 하므로 구현보다 먼저 계약 PR을 `dev`에 반영하고, 영향받는 모듈(backend, frontend) 담당자의 승인을 받는다.
+- **내용(초안, 아래 결정이 정해지면 확정)**
+  - 질의응답이 끝날 때 메시지를 DB에 기록한다(`error` 응답은 G와 같은 규칙으로 제외할지 정한다).
+  - DB 접속은 환경변수(`DATABASE_URL`)로 읽는다. compose에 PostgreSQL 서비스와 named volume을 추가한다.
+  - 스키마 생성·변경 방식(마이그레이션 도구)과 드라이버를 정한다.
+  - DB 장애가 응답 실패로 번지지 않게 한다(G·F와 같은 원칙).
+- **결정한 것**
+  - [x] **저장 범위**: `SessionTurn`(질문·답변·상태·출처·시각·`request_id`)을 저장한다. `SessionTurn`에 이미 `request_id`가 있어 **필드 추가는 없다**. 토큰·`trace_id` 등 `meta`는 저장하지 않는다(Langfuse가 가진다).
+  - [x] **Redis와의 관계**: DB가 원본이고 Redis는 캐시다. 기록은 둘 다 하고 조회는 Redis 우선, 없으면 DB에서 읽는다. G의 `RedisSessionStore`는 이 캐시 역할로 쓴다.
+  - [x] **만료 의미**: 만료 없음. `SessionInfo.expires_at`은 항상 `None`(이미 허용된 값)이고, 404는 세션이 한 번도 없었을 때만이다. Redis TTL은 캐시 수명일 뿐 사용자에게 보이지 않는다.
+  - [x] **접근 제어**: 지금처럼 UUID 세션 ID만 쓴다(인증·소유자 없음). 영구 저장으로 노출 위험이 커진다는 점을 README에 적는다.
+- **아직 정하지 않은 것**
+  - [ ] 조회 API: 기존 `GET /session/{id}`만 유지하는지(기본안), 목록·삭제 경로를 추가하는지(추가하면 계약 변경이 커진다).
+  - [ ] 개인정보·보존: 질문 원문을 영구 저장하므로 삭제 요청 처리와 마스킹(Langfuse에는 `redact`를 적용하는데 DB에는?)을 정한다. 보존 기간은 "만료 없음"으로 정했으므로 별도 삭제 수단이 필요한지 본다.
+  - [ ] DB 장애 시 동작: 기록 실패를 삼키고 건너뛰면 Redis에만 있는 턴이 캐시가 만료되면 사라진다. 재시도·대기열을 둘지, 실패한 턴을 Redis에 남기지 않을지 정한다.
+  - [ ] 캐시 일관성: Redis에는 최근 `SESSION_MAX_TURNS`개만 있으므로, 요청한 `limit`이 캐시 길이보다 크고 DB에 더 있으면 DB에서 읽어야 한다(캐시 적중 판정 규칙).
+  - [ ] 드라이버와 스키마 관리(마이그레이션 도구)와 비동기 사용 방식.
+- **계약 변경 범위(제안, 사람이 PR로 올린다)**: 타입 변경은 필요 없다. 바뀌는 것은 의미와 문서다. 고칠 곳: `common/api.py:12`(404 주석)·`common/interfaces.py:199`(`SessionService` 독스트링 "없거나 만료된 세션은 None" → "없는 세션은 None"), `CONTRACTS.md` 78·150줄(세션 절·TTL 동의 항목), `contracts/examples/session_info.json`의 `expires_at`(null로)과 `session_not_found.json`의 문구("세션이 없거나 만료되었습니다."), `CONTRACT_VERSION`·`CHANGELOG`·manifest. 버전을 어떻게 올릴지(의미 변경이므로 minor 또는 patch)는 사람이 정한다. 프런트엔드는 404 처리가 그대로 동작하지만 "서버에서 만료된 대화입니다" 안내(`ChatView.tsx`, `useChat.ts`, `lib/session.ts`)의 문구는 영구 저장 뒤에 사실과 맞지 않게 되므로 frontend 담당과 맞춘다.
+- **완료 기준(초안)**
+  - [ ] 계약 변경 PR이 먼저 `dev`에 반영됐다(`CONTRACT_VERSION`·`CHANGELOG`·manifest, 목업 갱신).
+  - [ ] 메시지가 DB에 기록되고, Redis 만료·상한과 무관하게 조회된다.
+  - [ ] DB가 꺼져 있어도 `/query`가 정상 응답한다.
+  - [ ] 재시작·재배포 뒤에도 이력이 남는다(named volume).
+- **테스트(안)**: 메모리 DB 대신 실제 PostgreSQL(compose)로 통합 테스트를 하거나, 저장소 인터페이스를 가짜로 대체한 단위 테스트와 실제 DB 수동 확인을 병행한다(정하면 여기에 적는다).
 
 ### H. Redis 캐시 (선택)
 
