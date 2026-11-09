@@ -72,7 +72,8 @@ async function send(
     if (callerSignal?.aborted) {
       throw new RequestError("aborted", "중지되었습니다", { cause: e });
     }
-    throw new RequestError("network", `서버에 연결하지 못했습니다 (${url})`, { cause: e });
+    // 문구에 주소를 넣지 않는다. 세션 조회 주소에는 세션 id 가 있고, 이 문구는 서버 로그에 남는다
+    throw new RequestError("network", "서버에 연결하지 못했습니다", { cause: e });
   }
 }
 

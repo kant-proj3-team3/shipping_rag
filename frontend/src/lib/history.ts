@@ -82,9 +82,7 @@ function readConversation(value: unknown): Conversation[] {
     return message.success ? [message.data] : [];
   });
   if (messages.length < parsed.data.messages.length) {
-    logWarning(
-      `대화 ${parsed.data.id} 의 깨진 메시지 ${parsed.data.messages.length - messages.length}개를 버렸다`,
-    );
+    logWarning(`깨진 메시지 ${parsed.data.messages.length - messages.length}개를 버렸다`);
   }
   return messages.length > 0 ? [{ ...parsed.data, messages }] : [];
 }
