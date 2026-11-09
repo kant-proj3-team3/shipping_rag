@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "ragContract": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
