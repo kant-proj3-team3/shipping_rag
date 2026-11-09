@@ -39,9 +39,22 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 
 ## 주요 설계 결정
 
-- 아직 없음(목업 단계). 프롬프트 구성, 토큰 예산, 캐시 키 구성, Langfuse 기록 단위를 정하면 여기에 기록한다.
+- 모델 호출(`chain.py`): 재시도는 별도 요청이 아니라 같은 요청의 일부다. 호출 실패와 읽을 수 없는 출력을 같은 시도 예산으로 다시 시도하고, 토큰은 응답을 받은 시도만 합산한다(하나라도 사용량이 없으면 `None`). 끝내 응답이 없으면 `ModelTimeoutError`/`ModelCallError`, 응답은 있으나 못 읽으면 `ChainResult.output=None`으로 돌려주고 `output_invalid` 판단은 검증 단계가 한다.
+- 아직 정하지 않은 것: 캐시 키 구성, Langfuse 기록 단위. 정하면 여기에 기록한다.
 - `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 둘 다 `REDIS_URL`을 읽는다.
 - 캐시 키의 `index_name`+`embedder_id`는 `retriever.index`에서 읽는다(`create_qa_service`가 `IndexManifest`를 따로 받지 않는다).
+
+## 설정 (환경변수)
+
+| 이름 | 기본값 | 설명 |
+|---|---|---|
+| `OPENAI_API_KEY` | (없음) | `ChatOpenAI`가 읽는다. 커밋하지 않는다 |
+| `LLM_MODEL` | `gpt-6-luna` | 생성 모델 |
+| `LLM_TIMEOUT_S` | `60` | 모델 호출 1회 timeout(초) |
+| `LLM_MAX_RETRIES` | `2` | 첫 호출 뒤 추가 시도 횟수 |
+| `LLM_MAX_CALLS` | `3` | 한 요청의 모델 호출 상한. 시도 횟수는 `min(1+MAX_RETRIES, MAX_CALLS)` |
+
+기본값은 임시이며 팀이 정하면 환경변수로 바꾼다.
 
 ## 테스트
 

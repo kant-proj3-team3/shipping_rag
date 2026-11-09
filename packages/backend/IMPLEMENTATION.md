@@ -9,8 +9,8 @@
 | 단위 | 이름 | 단계 | 상태 |
 |---|---|---|---|
 | A | 프롬프트·출력 스키마 | 1 | 완료(#5) |
-| B | 문맥 빌더 | 1 | 구현 완료(PR 대기) |
-| C | LangChain 체인 | 1 | 미착수 |
+| B | 문맥 빌더 | 1 | 완료(#7) |
+| C | LangChain 체인 | 1 | 구현 완료(PR 대기) |
 | D | 출력 검증·출처 매핑 | 1 | 미착수 |
 | E | 오류 매핑 | 1 | 미착수 |
 | F | Langfuse 트레이싱 | 2 | 미착수 |
@@ -88,10 +88,20 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 테스트에서 외부 호출 없이 쓸 수 있도록 LLM 객체를 주입받는 구조로 만든다.
 - **파일**: `src/backend/chain.py`, 의존성은 `pyproject.toml`에 추가(`langchain-openai` 등)
 - **완료 기준**
-  - [ ] 모의 LLM으로 정상·timeout·예외 경로가 모두 재현된다.
-  - [ ] 토큰 사용량이 없을 때 0이 아니라 `None`이다.
-  - [ ] 재시도 합산 토큰이 맞다.
-- **테스트**: 가짜 LLM(고정 응답, 지연, 예외).
+  - [x] 모의 LLM으로 정상·timeout·예외 경로가 모두 재현된다.
+  - [x] 토큰 사용량이 없을 때 0이 아니라 `None`이다.
+  - [x] 재시도 합산 토큰이 맞다.
+- **구현 메모**
+  - `AnswerChain.generate(question, context_text, variant, *, callbacks=None) -> ChainResult`. 모델을 한 번 부르는 한 시도는 LCEL 파이프 `RunnableLambda(_to_messages) | llm | RunnableLambda(_parse_reply)`이고, 바깥 루프가 시도 예산·timeout·재시도·토큰 합산을 맡는다. 구조 그림은 `chain.py` 모듈 docstring에 있다.
+  - 프롬프트는 `render_prompt`로 만들어 system/user 메시지로 그대로 보낸다. 시스템 프롬프트의 JSON 예시 중괄호가 템플릿 변수로 읽히지 않도록 `ChatPromptTemplate` 대신 `RunnableLambda`로 메시지를 만든다. 파서는 `ModelOutput` 스키마 검증이다(코드 블록 표시는 벗긴다).
+  - 콜백: `callbacks`(예: Langfuse `CallbackHandler`)를 시도마다 `config`로 넘기고, 단계 이름(`generate-answer`/`render-prompt`/`parse-output`)과 `metadata`(`attempt`, `prompt_version`)를 붙인다. F 단계는 chain을 고치지 않고 콜백만 넘기면 된다. 기록 장애를 응답에서 격리하는 일은 F의 몫이다.
+  - 재시도를 `.with_retry()`로 하지 않는 이유: 호출 실패와 읽을 수 없는 출력을 같은 예산으로 세고, 시도마다 토큰을 합산해야 한다.
+  - 환경변수: `LLM_MODEL`(기본 `gpt-6-luna`), `LLM_TIMEOUT_S`(60), `LLM_MAX_RETRIES`(2), `LLM_MAX_CALLS`(3). 기본값은 **임시**이며 팀이 정한다. 시도 횟수 = `min(1 + MAX_RETRIES, MAX_CALLS)`.
+  - 재시도 대상은 호출 실패(timeout 포함)와 **읽을 수 없는 출력**(JSON·스키마 위반)이다. 둘 다 같은 시도 예산을 쓴다. 문맥에 없는 `source_id` 같은 의미 검증은 D가 하고, D의 재생성은 `generate`를 다시 부르는 것이므로 그 호출의 토큰·시도는 호출자(E)가 합산한다.
+  - 끝내 응답을 못 받으면 `ModelTimeoutError`(`model_timeout`) / `ModelCallError`(`model_failed`)를 던진다(E가 `error_code`로 바꾼다). 응답은 받았지만 끝내 못 읽으면 예외가 아니라 `output=None` + `parse_error`로 돌려준다(D가 `output_invalid`로 처리). 예외 문구에 원본 오류 메시지를 넣지 않는다.
+  - 토큰: 응답을 받은 시도만 합산한다. 예외로 끝난 시도는 사용량을 알 수 없어 더하지 않는다. 응답 중 하나라도 사용량이 없으면 합계는 `None`이다.
+  - 모델 객체는 `ainvoke`가 있는 Runnable을 주입받는다. 주입하지 않으면 `ChatOpenAI`를 만든다(SDK 재시도는 끄고 체인이 재시도한다, `temperature=0`).
+- **테스트**: `tests/test_chain.py`(가짜 LLM: 고정 응답, 지연, 예외, 사용량 없음, 읽을 수 없는 출력).
 
 ### D. 출력 검증·출처 매핑
 
