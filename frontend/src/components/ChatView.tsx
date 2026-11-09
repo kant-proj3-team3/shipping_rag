@@ -30,27 +30,30 @@ interface EmptyStateProps {
 
 function EmptyState({ onPickExample }: EmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto p-6 text-center">
-      <div>
-        <h2 className="text-xl font-semibold">무엇이 궁금하신가요?</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          부산–LA 일반 건화물의 예약 · 서류 절차와 보관료를 물으면 자료집을 근거로 결론 · 근거 ·
-          출처를 답합니다.
-        </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 text-center">
+      {/* justify-center 로 가운데에 두면 화면이 낮을 때 넘친 위쪽을 스크롤로 볼 수 없어 my-auto 를 쓴다 */}
+      <div className="my-auto flex flex-col items-center gap-6">
+        <div>
+          <h2 className="text-xl font-semibold">무엇이 궁금하신가요?</h2>
+          <p className="mt-2 text-sm text-zinc-500">
+            부산–LA 일반 건화물의 예약 · 서류 절차와 보관료를 물으면 자료집을 근거로 결론 · 근거 ·
+            출처를 답합니다.
+          </p>
+        </div>
+        <ul className="flex w-full max-w-md flex-col gap-2">
+          {EXAMPLES.map((text) => (
+            <li key={text}>
+              <button
+                type="button"
+                onClick={() => onPickExample(text)}
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                {text}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="flex w-full max-w-md flex-col gap-2">
-        {EXAMPLES.map((text) => (
-          <li key={text}>
-            <button
-              type="button"
-              onClick={() => onPickExample(text)}
-              className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              {text}
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
