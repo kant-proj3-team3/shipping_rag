@@ -11,6 +11,7 @@ import type { QueryRequest, RetrievalMode } from "../api/types";
 import {
   answerFromResponse,
   newId,
+  stoppedAnswerFromSession,
   withAnswerState,
   withQuestion,
   type AnswerState,
@@ -70,7 +71,8 @@ export interface UseChatResult {
  * - 대화 하나 = 서버 세션 하나. 대화 id 가 곧 session_id 다
  * - 목록은 브라우저 저장소에 남긴다 (서버 기록에는 근거 · 오류 안내가 없다)
  * - 대화를 열거나 새로고침하면 서버 세션을 확인한다 (useSessionLookup · lib/session.ts).
- *   브라우저에 내용이 없으면 서버 기록으로 채우고, 만료됐으면 알린 뒤 다음 질문을 새 대화로 보낸다
+ *   브라우저에 내용이 없으면 서버 기록으로 채우고, 만료됐으면 알린 뒤 다음 질문을 새 대화로 보낸다.
+ *   받지 못하고 중지로 남은 마지막 답변은 서버가 기록해 두었으면 그 기록으로 채운다
  */
 export function useChat(): UseChatResult {
   const api = useApi();
@@ -99,10 +101,38 @@ export function useChat(): UseChatResult {
   const currentId = status === "missing" ? undefined : history.currentId;
   const restoredId = restored?.id;
   const activeId = ask.isPending ? ask.variables.request.sessionId : undefined;
+  const sessionInfo = lookup.state === "done" ? lookup.info : null;
 
   useEffect(() => {
     saveCurrentId(storage, currentId);
   }, [storage, currentId]);
+
+  // 서버 응답을 브라우저 저장본에 맞추는 일이라 렌더 중에 할 수 없다
+  useEffect(() => {
+    if (sessionInfo === null) {
+      return;
+    }
+    const conversation = historyRef.current.conversations.find(
+      (c) => c.id === sessionInfo.sessionId,
+    );
+    const filled = conversation && stoppedAnswerFromSession(conversation, sessionInfo);
+    if (!filled) {
+      return;
+    }
+    updateHistory(
+      (h) => ({
+        ...h,
+        conversations: withAnswerState(
+          h.conversations,
+          sessionInfo.sessionId,
+          filled.answerId,
+          { state: "done", answer: filled.answer },
+          sessionInfo.lastActiveAt,
+        ),
+      }),
+      true,
+    );
+  }, [sessionInfo, historyRef, updateHistory]);
 
   function finish(conversationId: string, answerId: string, next: AnswerState): void {
     updateHistory(

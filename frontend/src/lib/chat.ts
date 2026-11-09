@@ -58,6 +58,11 @@ function uuidV4Byte(byte: number, i: number): number {
   return byte;
 }
 
+// 세션 기록의 답변. 서버 기록에는 근거가 없다
+function answerFromTurn(turn: SessionTurn): Answer {
+  return { status: turn.status, answer: turn.answer, reason: null, citations: turn.citations };
+}
+
 // 세션 기록(오래된 것 → 최신 순) → 질문 · 답변 메시지
 function messagesFromSession(turns: SessionTurn[]): Message[] {
   return turns.flatMap((turn): Message[] => [
@@ -67,14 +72,16 @@ function messagesFromSession(turns: SessionTurn[]): Message[] {
       role: "assistant",
       question: turn.question,
       state: "done",
-      answer: {
-        status: turn.status,
-        answer: turn.answer,
-        reason: null,
-        citations: turn.citations,
-      },
+      answer: answerFromTurn(turn),
     },
   ]);
+}
+
+// 서버 세션에 기록되는 답변인지. status=error 응답과 응답을 받지 못한 질문은 기록되지 않는다
+function isServerAnswer(message: Message): boolean {
+  return (
+    message.role === "assistant" && message.state === "done" && message.answer.status !== "error"
+  );
 }
 
 /**
@@ -129,14 +136,32 @@ export function hasPendingAnswer(messages: Message[]): boolean {
   return messages.some((m) => m.role === "assistant" && m.state === "pending");
 }
 
-/**
- * 서버 세션에 기록이 있어야 하는 대화인지: 서버가 답한 질문이 하나라도 있으면 그렇다.
- * status=error 응답과 응답을 받지 못한 질문은 서버에 기록되지 않는다
- */
+/** 서버 세션에 기록이 있어야 하는 대화인지: 서버가 답한 질문이 하나라도 있으면 그렇다 */
 export function hasServerTurn(messages: Message[]): boolean {
-  return messages.some(
-    (m) => m.role === "assistant" && m.state === "done" && m.answer.status !== "error",
-  );
+  return messages.some(isServerAnswer);
+}
+
+/**
+ * 받지 못하고 중지로 남은 마지막 답변을 서버 기록으로 채울 내용. 새로고침 · 탭 닫기로 끊겨도 서버는 답을 끝내 기록할 수 있다.
+ * 마지막 질문과 서버의 마지막 기록이 같고, 서버 기록이 브라우저에 있는 답보다 많을 때만 채운다
+ *
+ * @returns 채울 답변. 채울 것이 없으면 undefined
+ */
+export function stoppedAnswerFromSession(
+  conversation: Conversation,
+  info: SessionInfo,
+): { answerId: string; answer: Answer } | undefined {
+  const last = conversation.messages.at(-1);
+  const turn = info.turns.at(-1);
+  if (
+    last?.role !== "assistant" ||
+    last.state !== "stopped" ||
+    turn?.question !== last.question ||
+    conversation.messages.filter(isServerAnswer).length >= info.turnCount
+  ) {
+    return undefined;
+  }
+  return { answerId: last.id, answer: answerFromTurn(turn) };
 }
 
 /** 질문 하나를 보낼 때 쓰는 id 와 시각. 부르는 쪽이 만들어 넘겨 함수는 순수하게 둔다 */
