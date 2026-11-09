@@ -7,10 +7,17 @@ import {
   type RefObject,
 } from "react";
 
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { MAX_QUESTION_LENGTH } from "../lib/config";
 
 /** IME 합성 중 keydown 의 keyCode (일부 브라우저는 isComposing 대신 이것만 준다) */
 const IME_KEY_CODE = 229;
+
+/** 터치가 주 입력인 기기. 화면 키보드에는 Shift+Enter 가 없어 Enter 를 줄바꿈으로 둔다 */
+const TOUCH_QUERY = "(pointer: coarse)";
+
+const KEYBOARD_HINT = "Enter 전송 · Shift+Enter 줄바꿈";
+const TOUCH_HINT = "Enter 줄바꿈 · 전송 버튼으로 보내기";
 
 /** 입력창 최대 높이. 넘으면 입력창 안에서 스크롤한다 */
 const MAX_HEIGHT_PX = 200;
@@ -45,7 +52,7 @@ function fitHeight(ref: RefObject<HTMLTextAreaElement | null>): void {
 }
 
 /**
- * 질문 입력: 자동 높이 · Enter 전송(한글 IME 합성 중 제외) · 전송/중지.
+ * 질문 입력: 자동 높이 · Enter 전송(한글 IME 합성 중 제외, 터치 기기는 줄바꿈) · 전송/중지.
  * 계약 한도(MAX_QUESTION_LENGTH)를 넘는 글자는 입력되지 않는다.
  */
 export function Composer({
@@ -57,8 +64,9 @@ export function Composer({
   isDisabled = false,
   inputRef,
   placeholder = "질문을 입력하세요",
-  hint = "Enter 전송 · Shift+Enter 줄바꿈",
+  hint,
 }: ComposerProps) {
+  const isTouch = useMediaQuery(TOUCH_QUERY, false);
   const countId = useId();
   const localRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = inputRef ?? localRef;
@@ -95,7 +103,7 @@ export function Composer({
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (e.key !== "Enter" || e.shiftKey) {
+    if (e.key !== "Enter" || e.shiftKey || isTouch) {
       return;
     }
     if (e.nativeEvent.isComposing || e.keyCode === IME_KEY_CODE || justComposedRef.current) {
@@ -155,7 +163,7 @@ export function Composer({
         )}
       </div>
       <div className="mt-1.5 flex justify-between gap-4 px-2 text-xs text-zinc-500">
-        <span>{hint}</span>
+        <span>{hint ?? (isTouch ? TOUCH_HINT : KEYBOARD_HINT)}</span>
         <span id={countId} className="shrink-0 tabular-nums">
           {value.length} / {MAX_QUESTION_LENGTH}
         </span>
