@@ -9,6 +9,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SidebarDrawer } from "./components/SidebarDrawer";
 import { ThemeSelect } from "./components/ThemeSelect";
 import { useChat } from "./hooks/useChat";
+import { useDraft } from "./hooks/useDraft";
 import { useDrawer } from "./hooks/useDrawer";
 import { useHealth, type HealthState } from "./hooks/useHealth";
 import { useTheme } from "./hooks/useTheme";
@@ -23,6 +24,9 @@ const CHECKING_HINT = "이전 대화를 확인하는 중입니다. 잠시 뒤 �
 
 /** 다른 대화가 답변을 받는 동안 입력창 아래 안내 (요청은 한 번에 하나) */
 const BUSY_ELSEWHERE_HINT = "다른 대화의 답변을 받는 중입니다. 끝나면 보낼 수 있습니다";
+
+/** 새 대화 화면의 입력 초안 키 (대화 id 와 겹치지 않는 형식: 세션 id 는 8자 이상이다) */
+const NEW_CHAT_DRAFT_KEY = "new";
 
 /** 지금 보낼 수 없는 이유. 보낼 수 있으면 undefined (입력창이 키 사용법을 보여 준다) */
 function composerHintOf(isChecking: boolean, isBusyElsewhere: boolean): string | undefined {
@@ -53,7 +57,7 @@ export function App() {
     panelRef,
     triggerRef,
   } = useDrawer();
-  const [draft, setDraft] = useState("");
+  const { draft, setDraft, fillIfEmpty } = useDraft(chat.currentId ?? NEW_CHAT_DRAFT_KEY);
   const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(DEFAULT_RETRIEVAL_MODE);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -64,14 +68,17 @@ export function App() {
   const isBusyHere = chat.isBusy && chat.activeId === chat.currentId;
   const isBusyElsewhere = chat.isBusy && !isBusyHere;
 
-  function handleClarify(question: string): void {
-    setDraft(question);
-    inputRef.current?.focus();
-  }
+  // memo 된 대화 화면에 넘기므로 렌더마다 새로 만들지 않는다. 되묻기의 원래 질문 · 예시 질문을 입력창에 채운다
+  const handleFillDraft = useCallback(
+    (text: string) => {
+      fillIfEmpty(text);
+      inputRef.current?.focus();
+    },
+    [fillIfEmpty],
+  );
 
   function handleNewChat(): void {
     chat.newChat();
-    setDraft("");
     if (isDrawer) {
       closeDrawer();
     } else {
@@ -150,8 +157,8 @@ export function App() {
             messages={chat.messages}
             isChecking={chat.isChecking}
             isExpired={chat.isExpired}
-            onClarify={handleClarify}
-            onPickExample={setDraft}
+            onClarify={handleFillDraft}
+            onPickExample={handleFillDraft}
           />
         </ErrorBoundary>
         <Composer
