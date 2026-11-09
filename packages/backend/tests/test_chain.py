@@ -260,6 +260,26 @@ def test_prompt_with_braces_is_not_treated_as_template():
     assert '{"status"' in llm.last_messages[0].content
 
 
+# ── 호출 수 상한 인자(검증 단계가 요청 전체 호출 수를 지키려고 넘긴다) ──
+def test_attempt_limit_lowers_attempts():
+    llm = FakeLLM(*[RuntimeError("x")] * 5)
+    with pytest.raises(ModelCallError):
+        run(_chain(llm, max_retries=10, max_calls=10).generate("q", "c", attempt_limit=2))
+    assert llm.calls == 2
+
+
+def test_attempt_limit_cannot_exceed_config():
+    llm = FakeLLM(*[RuntimeError("x")] * 5)
+    with pytest.raises(ModelCallError):
+        run(_chain(llm, max_retries=1).generate("q", "c", attempt_limit=9))
+    assert llm.calls == 2
+
+
+def test_attempt_limit_is_at_least_one():
+    llm = FakeLLM(_msg(GOOD))
+    assert run(_chain(llm).generate("q", "c", attempt_limit=0)).attempts == 1
+
+
 # ── 실제 모델 객체 설정(네트워크 호출 없음) ──
 # gpt-6-luna 는 추론 모델이라 temperature=0 을 400 으로 거부한다. 가짜 LLM 만 쓰는 테스트로는 이를 잡을 수 없어서,
 # ChatOpenAI 를 만들어 보내는 파라미터를 직접 확인한다.

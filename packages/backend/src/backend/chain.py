@@ -333,15 +333,21 @@ class AnswerChain:
         variant: PromptVariant = PromptVariant.BASE,
         *,
         callbacks: Sequence[BaseCallbackHandler] | None = None,
+        attempt_limit: int | None = None,
     ) -> ChainResult:
         """모델을 불러 출력을 얻는다.
 
         callbacks: LangChain 콜백(예: Langfuse CallbackHandler). 시도마다 그대로 넘긴다. 기록 장애를 막는 일은
             호출자(F)의 몫이며, 이 함수는 콜백이 있든 없든 같은 결과를 낸다.
+        attempt_limit: 이번 호출에서 쓸 수 있는 시도 수의 상한. 설정의 max_attempts 보다 작으면 이쪽이 적용된다.
+            검증 단계가 재생성하면서 요청 전체의 호출 수(LLM_MAX_CALLS)를 지키려고 남은 호출 수를 넘긴다.
         예외: 모든 시도가 호출 실패면 ModelTimeoutError / ModelCallError. 응답은 받았는데 끝내 못 읽은 경우는
             예외가 아니라 `output=None` 인 결과로 돌려준다(D 가 output_invalid 로 처리).
         """
         prompt = render_prompt(question, context_text, variant)
+        max_attempts = self._config.max_attempts
+        if attempt_limit is not None:
+            max_attempts = max(1, min(max_attempts, attempt_limit))
 
         # 토큰 합산 상태. 응답을 받은 시도만 더하고, 하나라도 사용량이 없으면 합계는 믿을 수 없어 None 이 된다.
         # (예외로 끝난 시도는 응답이 없어 사용량을 알 수 없으므로 더하지 않는다.)
@@ -350,7 +356,7 @@ class AnswerChain:
         last_failure: BaseException | None = None  # 마지막 호출 실패(응답을 못 받은 시도)
         last_reply: _Reply | None = None  # 마지막으로 받은 응답
 
-        for attempt in range(1, self._config.max_attempts + 1):
+        for attempt in range(1, max_attempts + 1):
             run_config: RunnableConfig = {
                 "run_name": RUN_NAME,
                 "metadata": {"attempt": attempt, "prompt_version": prompt.version},
@@ -400,7 +406,7 @@ class AnswerChain:
             raw_text=last_reply.raw_text,
             parse_error=last_reply.parse_error,
             prompt=prompt,
-            attempts=self._config.max_attempts,
+            attempts=max_attempts,
             input_tokens=in_total if usage_known else None,
             output_tokens=out_total if usage_known else None,
         )
