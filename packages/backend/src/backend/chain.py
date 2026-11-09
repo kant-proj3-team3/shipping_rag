@@ -5,8 +5,8 @@
 
 모델을 한 번 부르는 한 "시도"는 LCEL 파이프 세 단계다::
 
-    RenderedPrompt ──▶ [to_messages] ──▶ [llm] ──▶ [parse_reply] ──▶ _Reply
-                       메시지 목록 만들기   모델 호출   원문·토큰·파싱 결과 정리
+    RenderedPrompt ──▶ [to_messages] ──▶ [structured llm] ──▶ [parse_reply] ──▶ _Reply
+                       메시지 목록 만들기   모델 호출(구조화 출력)   원문·토큰·파싱 결과 정리
 
 그리고 이 시도를 `AnswerChain.generate` 가 바깥 루프로 감싼다::
 
@@ -18,9 +18,20 @@
            ├─ 읽을 수 없는 출력            → 다음 시도
            └─ 읽은 출력                    → ChainResult 반환
 
+구조화 출력
+-----------
+모델은 OpenAI Chat Completions 의 `json_schema`(strict) 로 `ModelOutput` 스키마를 강제받는다
+(`ChatOpenAI.with_structured_output(ModelOutput, method="json_schema", strict=True, include_raw=True)`).
+`include_raw=True` 라서 파이프 출력은 `{"raw": AIMessage, "parsed": ModelOutput | None, "parsing_error": ...}` 이고,
+raw 에서 원문과 토큰 사용량을 읽는다. Responses API 는 쓰지 않는다(strict 구조화 출력에서 응답 항목이 하나 더 붙는다는
+보고가 있어 Chat Completions 로 고정했다).
+스키마가 형식을 강제해도 다음은 막지 못해서 코드가 계속 확인한다: `status=error`(스키마의 enum 에는 있지만 모델이
+고를 수 없다), answered 인데 출처 없음(`ModelOutput` 검증기), 출처가 이번 문맥에 있는지(validate, D 단계). 그래서
+`parsed` 가 None 일 수 있고, 그때는 재시도한다. 거부(refusal)도 같은 경로다.
+
 이 모듈이 하는 일과 하지 않는 일
 --------------------------------
-- 한다: 모델을 부르고, 원문을 `ModelOutput` 스키마로 읽고, 토큰 사용량을 모은다.
+- 한다: 모델을 부르고, 구조화된 결과를 `ModelOutput` 으로 받고, 토큰 사용량을 모은다.
 - 하지 않는다: 출력의 source_id 가 이번 문맥에 있는지 확인하거나 출처(Citation)를 채우는 일(validate, D 단계),
   `status=error` 응답을 만드는 일(qa, E 단계), Langfuse 로 기록을 보내는 일(tracing, F 단계).
   다만 F 단계가 chain 을 다시 고치지 않도록, 콜백(`callbacks`)을 받아 LangChain 에 그대로 넘기는 자리는 열어 두었다.
@@ -35,10 +46,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import logging
 import os
-import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,6 +66,17 @@ ENV_LLM_MODEL = "LLM_MODEL"
 ENV_LLM_TIMEOUT_S = "LLM_TIMEOUT_S"
 ENV_LLM_MAX_RETRIES = "LLM_MAX_RETRIES"
 ENV_LLM_MAX_CALLS = "LLM_MAX_CALLS"
+ENV_LLM_REASONING_EFFORT = "LLM_REASONING_EFFORT"
+ENV_LLM_TEMPERATURE = "LLM_TEMPERATURE"
+
+# gpt-6-luna 가 받는 추론 강도(OpenAI 모델 문서 기준). 이 밖의 값은 무시하고 기본값을 쓴다.
+REASONING_EFFORTS = frozenset({"none", "low", "medium", "high", "xhigh", "max"})
+DEFAULT_REASONING_EFFORT = "medium"
+# temperature 는 추론을 끈 때(none)만 바꿀 수 있다. 실제 호출로 확인: none 은 0·0.2·1 모두 정상,
+# low·medium·미설정은 1 이 아닌 값을 400 으로 거부한다.
+TEMPERATURE_REASONING_EFFORT = "none"
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gpt-6-luna"
 # 아래 기본값은 임시다. 팀이 정하면 환경변수로 바꾼다(코드 수정 없음).
@@ -95,6 +116,22 @@ def _env_number(name: str, default: float, *, minimum: float, cast: type = float
     return value if value >= minimum else default
 
 
+def _env_reasoning_effort() -> str:
+    """LLM_REASONING_EFFORT 를 읽는다. 비었거나 허용 값이 아니면 기본값(medium)."""
+    raw = os.environ.get(ENV_LLM_REASONING_EFFORT, "").strip().lower()
+    return raw if raw in REASONING_EFFORTS else DEFAULT_REASONING_EFFORT
+
+
+def _env_temperature() -> float | None:
+    """LLM_TEMPERATURE 를 읽는다. 비었거나 숫자가 아니거나 0~2 밖이면 None(보내지 않는다)."""
+    raw = os.environ.get(ENV_LLM_TEMPERATURE, "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if 0.0 <= value <= 2.0 else None
+
+
 # 체인 설정 정보 클래스
 @dataclass(frozen=True)
 class ChainConfig:
@@ -102,6 +139,10 @@ class ChainConfig:
     timeout_s: float = DEFAULT_TIMEOUT_S  # 시도 1회의 제한 시간
     max_retries: int = DEFAULT_MAX_RETRIES  # 첫 호출 뒤 추가로 시도할 수 있는 횟수
     max_calls: int = DEFAULT_MAX_CALLS  # 한 요청의 모델 호출 상한(재시도 포함). max_retries 와 작은 쪽이 적용된다
+    # 추론 강도. 항상 모델에 보낸다(기본 medium). 추론이 켜져 있으면 temperature 를 바꿀 수 없다(build_chat_model 참고).
+    reasoning_effort: str = DEFAULT_REASONING_EFFORT
+    # None 이면 보내지 않는다. reasoning_effort 가 none 일 때만 보낸다(그 외에는 무시하고 경고만 남긴다).
+    temperature: float | None = None
 
     @property
     def max_attempts(self) -> int:
@@ -116,6 +157,8 @@ class ChainConfig:
             timeout_s=_env_number(ENV_LLM_TIMEOUT_S, DEFAULT_TIMEOUT_S, minimum=0.001),
             max_retries=int(_env_number(ENV_LLM_MAX_RETRIES, DEFAULT_MAX_RETRIES, minimum=0, cast=int)),
             max_calls=int(_env_number(ENV_LLM_MAX_CALLS, DEFAULT_MAX_CALLS, minimum=1, cast=int)),
+            reasoning_effort=_env_reasoning_effort(),
+            temperature=_env_temperature(),
         )
 
 
@@ -154,10 +197,6 @@ def _to_messages(prompt: RenderedPrompt) -> list[BaseMessage]:
     return [SystemMessage(content=prompt.system), HumanMessage(content=prompt.user)]
 
 
-# 코드 펜스를 벗기는 정규식
-_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
-
-
 # 메시지에서 내용을 추출해내는 함수
 def _message_text(message: Any) -> str:
     """AIMessage 의 본문을 문자열로 꺼낸다. content 가 블록 목록(list)일 수도 있다."""
@@ -184,41 +223,40 @@ def _usage(message: Any) -> tuple[int, int] | None:
     return None
 
 
-def parse_model_output(text: str) -> ModelOutput:
-    """모델 원문을 `ModelOutput` 으로 읽는다. 실패하면 ValueError(이유 문자열 포함).
+def _summarize_error(error: BaseException | None, raw_message: Any) -> str:
+    """파싱 실패 이유를 안전한 한 줄로 요약한다. 모델이 쓴 내용(입력값)은 넣지 않는다.
 
-    프롬프트가 "코드 블록 표시를 붙이지 말라"고 해도 모델이 ```json 으로 감싸는 일이 있어 그 겉껍질만 벗긴다.
-    문장 앞뒤에 설명이 붙은 응답까지 구해 주지는 않는다(형식을 어긴 출력을 너무 관대하게 받지 않는다).
+    pydantic 오류의 `str()` 에는 입력 값이 들어갈 수 있어서, 스키마 위반이면 규칙 메시지(`msg`)만 모은다.
     """
-    body = text.strip()
-    fenced = _FENCE.match(body)
-    if fenced:
-        body = fenced.group(1)
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"JSON 이 아니다: {e.msg}") from e
-    if not isinstance(data, dict):
-        raise ValueError("JSON 객체가 아니다")
-    try:
-        return ModelOutput.model_validate(data)
-    except ValidationError as e:
-        # status=error, answered 인데 출처 없음, 필드 누락·초과 등이 여기서 걸린다.
-        raise ValueError("출력 스키마 위반: " + "; ".join(err["msg"] for err in e.errors())) from e
+    refusal = getattr(raw_message, "additional_kwargs", {}).get("refusal") if raw_message is not None else None
+    if refusal:
+        return "모델이 응답을 거부했다"
+    seen: BaseException | None = error
+    while seen is not None:  # 원인 사슬에서 pydantic 검증 오류를 찾는다
+        if isinstance(seen, ValidationError):
+            return "출력 스키마 위반: " + "; ".join(err["msg"] for err in seen.errors())
+        seen = seen.__cause__ or seen.__context__
+    return f"구조화 출력을 읽을 수 없다({type(error).__name__ if error is not None else 'parsed 없음'})"
 
 
-def _parse_reply(message: Any) -> _Reply:
-    """3단계: 모델 응답에서 원문·토큰·파싱 결과를 한꺼번에 챙긴다.
+def _parse_reply(result: Mapping[str, Any]) -> _Reply:
+    """3단계: 구조화 출력 결과(`raw`/`parsed`/`parsing_error`)에서 원문·토큰·파싱 결과를 챙긴다.
 
-    파싱 실패를 예외로 던지지 않는 이유가 두 가지다. ① 던지면 그 응답의 토큰이 사라진다(이미 쓴 토큰은 합산해야
-    한다). ② 원문은 트레이스와 output_invalid 판단에 필요하다. 그래서 실패해도 `_Reply` 로 돌려준다.
+    읽지 못해도 예외를 던지지 않고 `_Reply` 로 돌려주는 이유가 두 가지다. ① 던지면 그 응답의 토큰이 사라진다(이미 쓴
+    토큰은 합산해야 한다). ② 원문은 트레이스와 output_invalid 판단에 필요하다.
     """
-    raw = _message_text(message)
-    try:
-        output, error = parse_model_output(raw), None
-    except ValueError as e:
-        output, error = None, str(e)
-    return _Reply(raw_text=raw, output=output, parse_error=error, usage=_usage(message))
+    raw_message = result.get("raw")
+    raw = _message_text(raw_message) if raw_message is not None else ""
+    usage = _usage(raw_message)
+    parsed = result.get("parsed")
+    if isinstance(parsed, ModelOutput):
+        return _Reply(raw_text=raw, output=parsed, parse_error=None, usage=usage)
+    return _Reply(
+        raw_text=raw,
+        output=None,
+        parse_error=_summarize_error(result.get("parsing_error"), raw_message),
+        usage=usage,
+    )
 
 
 def _is_timeout(error: BaseException | None) -> bool:
@@ -232,15 +270,47 @@ def build_chat_model(config: ChainConfig) -> Runnable:
     SDK 자체 재시도는 끈다(max_retries=0). 재시도는 이 모듈의 바깥 루프가 시도 예산 안에서 직접 센다.
     timeout 도 여기에 한 번 더 주지만, 가짜 LLM 이 주입된 테스트에서도 같은 제한이 걸리도록 generate 가
     asyncio.wait_for 로 따로 강제한다.
+
+    추론 강도와 temperature:
+    - reasoning_effort 는 항상 보낸다(기본 medium).
+    - gpt-6-luna 는 추론이 켜져 있으면(none 이 아니면) 기본값(1) 외의 temperature 를 400 으로 거부한다. 그래서
+      temperature 는 reasoning_effort 가 "none" 이고 값이 설정된 때만 보낸다. 그 외에 값이 설정돼 있으면 보내지
+      않고 경고를 남긴다(무시되는 줄 모르고 재현성이 확보됐다고 믿지 않게).
+    - 추론이 켜진 상태에서는 같은 질문의 답이 조금씩 다를 수 있다. 평가처럼 재현성이 필요하면
+      LLM_REASONING_EFFORT=none, LLM_TEMPERATURE=0 으로 고정한다.
     """
     from langchain_openai import ChatOpenAI  # 지연 import: 가짜 LLM 만 쓰는 테스트는 이 패키지 호출이 필요 없다
 
-    return ChatOpenAI(model=config.model, timeout=config.timeout_s, max_retries=0, temperature=0)
+    kwargs: dict[str, Any] = {"reasoning_effort": config.reasoning_effort}
+    if config.temperature is not None:
+        if config.reasoning_effort == TEMPERATURE_REASONING_EFFORT:
+            kwargs["temperature"] = config.temperature
+        else:
+            logger.warning(
+                "LLM_TEMPERATURE=%s 는 reasoning_effort=%s 에서 모델이 거부하므로 보내지 않는다 (none 일 때만 적용)",
+                config.temperature,
+                config.reasoning_effort,
+            )
+    # Responses API 로 자동 전환되지 않게 Chat Completions 로 고정한다(모듈 docstring 의 '구조화 출력' 참고).
+    return ChatOpenAI(model=config.model, timeout=config.timeout_s, max_retries=0, use_responses_api=False, **kwargs)
+
+
+def structured_model(chat_model: Runnable) -> Runnable:
+    """채팅 모델에 `ModelOutput` 스키마를 강제하는 구조화 출력을 입힌다(json_schema, strict).
+
+    결과는 `{"raw": AIMessage, "parsed": ModelOutput | None, "parsing_error": ...}` 를 돌려주는 Runnable 이다.
+    `AnswerChain` 이 받는 llm 은 이 형태여야 한다(테스트에서는 같은 모양을 돌려주는 가짜를 넣는다).
+    """
+    return chat_model.with_structured_output(ModelOutput, method="json_schema", strict=True, include_raw=True)
 
 
 # ── 체인 ─────────────────────────────────────────────────────────────
 class AnswerChain:
-    """주입받은 LLM 으로 답변을 생성한다. 테스트에서는 가짜 LLM(Runnable)을 넣는다."""
+    """주입받은 LLM 으로 답변을 생성한다.
+
+    llm 은 구조화 출력 결과(`{"raw", "parsed", "parsing_error"}`)를 돌려주는 Runnable 이다. 실제로는 `structured_model`
+    로 만들고, 테스트에서는 같은 모양을 돌려주는 가짜를 넣는다.
+    """
 
     def __init__(self, llm: Runnable, config: ChainConfig | None = None) -> None:
         self._config = config or ChainConfig.from_env()
@@ -337,6 +407,6 @@ class AnswerChain:
 
 
 def create_answer_chain(llm: Runnable | None = None, config: ChainConfig | None = None) -> AnswerChain:
-    """체인을 만든다. llm 을 주지 않으면 환경변수 설정으로 ChatOpenAI 를 만든다."""
+    """체인을 만든다. llm 을 주지 않으면 환경변수 설정으로 ChatOpenAI 를 만들어 구조화 출력을 입힌다."""
     cfg = config or ChainConfig.from_env()
-    return AnswerChain(llm if llm is not None else build_chat_model(cfg), cfg)
+    return AnswerChain(llm if llm is not None else structured_model(build_chat_model(cfg)), cfg)
