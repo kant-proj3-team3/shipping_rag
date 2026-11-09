@@ -10,7 +10,6 @@ import {
 
 export {
   ANSWER_STATUSES,
-  ERROR_CODES,
   QUERY_REQUEST_QUESTION_MAX_LENGTH,
   RETRIEVAL_MODES,
 } from "./generated/schemas.generated";
@@ -19,7 +18,6 @@ export type {
   Citation,
   ErrorCode,
   HealthResponse,
-  QueryMeta,
   QueryResponse,
   RetrievalMode,
   SessionInfo,
