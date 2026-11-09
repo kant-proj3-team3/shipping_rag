@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { AssistantMessage } from "./messages/AssistantMessage";
 import { UserMessage } from "./messages/UserMessage";
@@ -58,8 +58,7 @@ function EmptyState({ onPickExample }: EmptyStateProps) {
   );
 }
 
-/** 질문 · 답변 목록. 질문을 보내면 맨 아래로, 답이 오면 그 답의 처음(결론)이 보이게 내린다 */
-export function ChatView({
+function ChatViewInner({
   messages,
   isChecking,
   isExpired,
@@ -115,3 +114,9 @@ export function ChatView({
     </div>
   );
 }
+
+/**
+ * 질문 · 답변 목록. 질문을 보내면 맨 아래로, 답이 오면 그 답의 처음(결론)이 보이게 내린다.
+ * 대화가 길 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
+ */
+export const ChatView = memo(ChatViewInner);
