@@ -56,7 +56,7 @@
   - 색인은 청킹 모듈의 일이다. Qdrant sparse vector는 청킹이 색인할 때 sparse vector까지 만들어 넣어야 해서 청킹 담당과의 협의·계약 조율이 필요하다. `rank_bm25`는 `Chunk.text`(계약 필수 필드)만 있으면 되므로 협의 없이 모듈 안에서 끝난다.
   - 규모가 작다(PDF 50개, 3,750페이지). 청크 수천~수만 개는 메모리 BM25로 충분하다.
   - 외부로 나가는 것은 `Retriever.retrieve()` 결과뿐이라, 나중에 sparse vector로 바꿔도 계약은 그대로다.
-- **구현(`hybrid.py`)**: `HybridRetriever`가 `naive`와 `hybrid`를 처리한다. 생성할 때 `load_chunks`가 컬렉션의 청크를 읽어 BM25 인덱스를 만들고(청크가 없으면 BM25 없이 빈 결과), 컬렉션이 없거나 읽기에 실패하면 `IndexNotReadyError`다. 색인 형식에 의존하는 곳은 `load_chunks` 하나다. 토큰화는 소문자 변환 후 `\w+(-\w+)*`로 자르며, `R-0021` 같은 식별자는 한 토큰으로 둔다.
+- **구현(`hybrid.py`)**: `HybridRetriever`가 `naive`와 `hybrid`를 처리한다. 생성할 때 `load_chunks`가 컬렉션의 청크를 읽어 BM25 인덱스를 만들고(청크가 없으면 BM25 없이 빈 결과), 컬렉션이 없거나, 읽기에 실패하거나, payload가 `Chunk` 형식과 맞지 않으면 `IndexNotReadyError`다(시작 시점의 색인 형식 불일치는 "인덱스 준비 안 됨"으로 본다. 질의 중 `dense.py`의 같은 실패는 `RetrievalError`). 색인 형식에 의존하는 곳은 `load_chunks` 하나다. 토큰화는 소문자 변환 후 `\w+(-\w+)*`로 자르며, `R-0021` 같은 식별자는 한 토큰으로 둔다.
 - **감수할 점**
   - 재색인 후에는 api를 재시작해야 BM25가 갱신된다(CLAUDE.md의 "인덱스 반영은 재시작" 규칙과 같다).
   - 토큰화는 가장 단순한 방식이라 한국어 조사가 붙은 단어는 못 찾을 수 있다. 실제 색인으로 평가한 뒤 조정한다.

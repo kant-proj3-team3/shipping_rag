@@ -117,14 +117,17 @@ class HybridRetriever:
         self._dense = DenseRetriever(embedder, index, client)
 
 
+        # IndexNotReadyError는 그대로, 나머지(payload 형식 오류 포함)는 모두 IndexNotReadyError로 바꾼다.
         try:
 
             self._chunks = load_chunks(client, index.index_name)
 
-        except ContractError:
+        except IndexNotReadyError:
             raise
 
         except Exception as exc:
+            # 컬렉션 없음·연결 실패·payload 형식 불일치 모두 시작 시점에는 "인덱스 준비가 안됨"이다.
+            # (질의 중 같은 실패는 dense.py에서 RetrievalError로 남긴다)
             raise IndexNotReadyError(f"청크를 읽지 못했다: {exc}") from exc
         
 

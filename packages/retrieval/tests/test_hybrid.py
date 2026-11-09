@@ -86,6 +86,14 @@ def test_hybrid는_키워드가_맞는_청크를_Dense보다_위로_올린다(cl
     assert len({c.chunk.chunk_id for c in hybrid.chunks}) == len(hybrid.chunks)
 
 
+def test_payload_형식이_다르면_IndexNotReadyError():
+    c = QdrantClient(":memory:")
+    c.create_collection(COL, vectors_config=VectorParams(size=2, distance=Distance.COSINE))
+    c.upsert(COL, points=[PointStruct(id=1, vector=[1.0, 0.0], payload={"wrong": "shape"})])
+    with pytest.raises(IndexNotReadyError, match="Chunk"):
+        HybridRetriever(FakeEmbedder(), manifest(), c)
+
+
 def test_k_이하로_자른다(client):
     r = HybridRetriever(FakeEmbedder(), manifest(), client)
     assert len(asyncio.run(r.retrieve(req(k=2), CTX)).chunks) == 2
