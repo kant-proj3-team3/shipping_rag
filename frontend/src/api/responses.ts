@@ -1,4 +1,4 @@
-// 서버 응답(HTTP 상태 + 본문)을 화면 형식으로 읽는다. 실제 서버(httpClient)와 목업(mockClient)이 같은 함수로 읽는다.
+// 서버 응답(HTTP 상태 + 본문)을 화면 형식으로 읽는다.
 // 본문은 JSON 으로 읽은 값이다. JSON 이 아니면(프록시 오류 페이지 · 빈 본문) undefined 를 넘긴다.
 
 import { RequestError, type RequestErrorCode } from "./client";
