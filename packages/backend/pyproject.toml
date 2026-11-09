@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.110",
     "langchain-openai>=1.7.4",
     "langchain-core>=1.7.6",
+    "langfuse>=5.2",
 ]
 
 [build-system]

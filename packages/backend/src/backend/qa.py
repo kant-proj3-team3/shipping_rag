@@ -23,6 +23,8 @@
 - `meta.latency_ms` 는 수신~반환 전체이고 실패에도 채운다. 토큰은 확인된 값만(모르면 None).
   모델 호출이 예외로 끝난 요청은 응답을 받지 못해 토큰을 알 수 없으므로 None 이다.
 - 세션 기록 실패는 응답을 실패로 만들지 않는다(기록만 건너뛴다).
+- Langfuse 기록(F)은 주입받은 `Tracer` 로 하고, 어떤 트레이서든 장애 격리 래퍼를 씌운다. `meta.trace_id` 는 기록을 시작했을 때만
+  채운다(tracing.py 모듈 docstring 참고). 기록이 실패해도 응답은 그대로 나간다.
 """
 
 from __future__ import annotations
@@ -35,7 +37,18 @@ from typing import Protocol
 
 from backend.chain import AnswerChain, ModelCallError, ModelTimeoutError
 from backend.context import ContextBuild, build_context, context_max_tokens
-from backend.prompts import PromptVariant
+from backend.prompts import PromptVariant, prompt_version
+from backend.tracing import (
+    STEP_CONTEXT,
+    STEP_RETRIEVE,
+    NoopTracer,
+    RequestTrace,
+    TraceStep,
+    Tracer,
+    guard,
+    summarize_context,
+    summarize_retrieved,
+)
 from backend.validate import ValidatedAnswer, generate_validated
 from common.errors import IndexNotReadyError, InvalidInputError, RetrievalError
 from common.interfaces import Retriever
@@ -116,6 +129,7 @@ class BackendQAService:
         default_mode: RetrievalMode = DEFAULT_MODE,
         k: int = DEFAULT_K,
         variant: PromptVariant = PromptVariant.BASE,
+        tracer: Tracer | None = None,
     ) -> None:
         self._retriever = retriever
         self._chain = chain
@@ -123,11 +137,29 @@ class BackendQAService:
         self._default_mode = default_mode
         self._k = k
         self._variant = variant
+        # 기록은 부가 기능이다. 어떤 트레이서가 들어와도 장애 격리 래퍼를 씌워 응답에 영향이 없게 한다.
+        self._tracer: Tracer = guard(tracer if tracer is not None else NoopTracer())
 
     async def answer(self, request: QueryRequest, ctx: RequestContext) -> QAResult:
         started = time.perf_counter()
         mode = request.retrieval_mode or self._default_mode
+        trace = self._tracer.start(
+            ctx.request_id, request.question, mode, k=self._k, prompt_version=prompt_version(self._variant)
+        )
+        try:
+            result = await self._run(request, ctx, mode, started, trace)
+        except BaseException:  # CancelledError 등: 응답이 없어도 열린 단계를 닫는다
+            trace.abort()
+            raise
+        trace.end(result.response, result.final_context)
+        return result
+
+    async def _run(
+        self, request: QueryRequest, ctx: RequestContext, mode: RetrievalMode, started: float, trace: RequestTrace
+    ) -> QAResult:
         context: ContextBuild | None = None
+        active: TraceStep | None = None  # 실패했을 때 오류로 닫을 단계
+        trace_id = trace.trace_id  # 기록을 시작하지 못했으면 None
 
         def meta(input_tokens: int | None = None, output_tokens: int | None = None) -> QueryMeta:
             # 호출 시점에 재서 실패 응답에도 시간이 채워진다. 확인 못 한 값은 None 으로 둔다.
@@ -136,6 +168,7 @@ class BackendQAService:
                 latency_ms=(time.perf_counter() - started) * 1000,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                trace_id=trace_id,
             )
 
         def final_context() -> list[ContextItem]:
@@ -153,22 +186,45 @@ class BackendQAService:
             return QAResult(response=resp, final_context=final_context())  # 오류는 세션에 기록하지 않는다
 
         try:
+            active = trace.step(STEP_RETRIEVE, {"mode": mode.value, "k": self._k})
             retrieved = await self._retriever.retrieve(
                 RetrievalRequest(query=request.question, mode=mode, k=self._k), ctx
             )
-            context = build_context(retrieved.chunks, max_tokens=context_max_tokens())
+            active.end(summarize_retrieved(retrieved.chunks))
+
+            max_tokens = context_max_tokens()
+            active = trace.step(STEP_CONTEXT, {"max_tokens": max_tokens, "retrieved": len(retrieved.chunks)})
+            context = build_context(retrieved.chunks, max_tokens=max_tokens)
+            active.end(
+                summarize_context(
+                    context.items, context.dropped_chunk_ids, context.count_before, context.count_after, context.token_count
+                )
+            )
+            active = None
 
             if context.is_empty:  # 모델을 호출하지 않는다
                 reason = _EMPTY_REASON if not retrieved.chunks else _EMPTY_BUDGET_REASON
+                trace.annotate(model_called=False)
                 return self._finish(request, ctx, mode, meta(), AnswerStatus.ABSTAINED, _EMPTY_ANSWER, reason, [], [])
 
-            outcome = await generate_validated(self._chain, request.question, context, self._variant)
+            outcome = await generate_validated(
+                self._chain, request.question, context, self._variant, callbacks=trace.callbacks() or None
+            )
         except Exception as exc:  # noqa: BLE001 - 계약: 예외를 던지지 않고 error 응답으로 바꾼다
             code = error_code_for(exc)
+            if active is not None:
+                active.end(error=code.value)
+            trace.annotate(model_called=active is None)  # 단계가 닫힌 뒤에 난 오류 = 모델 호출 단계의 실패
             # 원본 메시지는 사용자 응답에 쓰지 않는다. 서버 로그에는 종류와 스택을 남긴다.
             logger.warning("질의 처리 실패 request_id=%s code=%s", ctx.request_id, code.value, exc_info=True)
             return error(code)
 
+        trace.annotate(
+            model_called=True,
+            model_calls=outcome.calls,
+            regenerations=outcome.regenerations,
+            validation_failure=outcome.failure,  # 안전한 요약(모델 원문 없음)
+        )
         if outcome.answer is None:
             logger.warning("출력 검증 실패 request_id=%s calls=%d", ctx.request_id, outcome.calls)
             return error(ErrorCode.OUTPUT_INVALID, outcome.input_tokens, outcome.output_tokens)
