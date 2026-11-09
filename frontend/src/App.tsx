@@ -116,7 +116,7 @@ export function App() {
           onRemove={chat.remove}
           lastDeleted={chat.lastDeleted}
           onUndoRemove={chat.undoRemove}
-          isStorageOk={chat.isStorageOk}
+          saveResult={chat.saveResult}
         />
       </SidebarDrawer>
 

@@ -21,6 +21,9 @@ const SHRINK_RATIO = 0.8;
 /** 저장소 용량 초과 예외 이름. NS_ERROR_DOM_QUOTA_REACHED 는 구버전 Firefox 가 쓴다 */
 const QUOTA_ERROR_NAMES: readonly string[] = ["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"];
 
+/** 저장 결과. trimmed 는 용량이 모자라 오래된 대화 일부를 저장본에서 뺀 경우다 */
+export type SaveResult = "saved" | "trimmed" | "failed";
+
 /** 불러온 대화 목록 */
 export interface LoadedHistory {
   /** 최신 활동순 */
@@ -128,23 +131,25 @@ export function loadHistory(storage: KeyValueStorage): LoadedHistory {
 /**
  * 대화 목록을 저장한다 (최신순 최대 MAX_CONVERSATIONS 개). 용량이 넘치면 오래된 대화부터 줄여 다시 쓴다.
  *
- * @returns 저장했으면 true (일부를 줄였어도 true), 저장할 수 없으면 false
+ * @returns 그대로 저장했으면 saved, 일부를 줄였으면 trimmed, 저장할 수 없으면 failed
  */
-export function saveHistory(storage: KeyValueStorage, conversations: Conversation[]): boolean {
+export function saveHistory(storage: KeyValueStorage, conversations: Conversation[]): SaveResult {
   let keep = sortByRecent(conversations).slice(0, MAX_CONVERSATIONS);
+  let result: SaveResult = "saved";
   for (;;) {
     try {
       storage.setItem(
         HISTORY_STORAGE_KEY,
         JSON.stringify({ version: HISTORY_VERSION, conversations: keep }),
       );
-      return true;
+      return result;
     } catch (e) {
       if (!isQuotaError(e) || keep.length <= 1) {
         logWarning("대화 목록을 저장하지 못했다", e);
-        return false;
+        return "failed";
       }
       keep = keep.slice(0, Math.floor(keep.length * SHRINK_RATIO));
+      result = "trimmed";
     }
   }
 }

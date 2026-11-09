@@ -1,5 +1,6 @@
 // 화면 표시 이름은 이 파일 한 곳에 모은다.
 
+import type { SaveResult } from "./history";
 import type { RequestErrorCode } from "../api/client";
 import type { RetrievalMode } from "../api/types";
 
@@ -20,6 +21,12 @@ export const RETRIEVAL_MODE_NAMES: Record<RetrievalMode, string> = {
   naive: "Naive",
   hybrid: "하이브리드",
   hybrid_rerank: "하이브리드 + 리랭킹",
+};
+
+/** 대화 목록을 다 저장하지 못했을 때 사이드바 안내 */
+export const SAVE_WARNING_TEXT: Record<Exclude<SaveResult, "saved">, string> = {
+  trimmed: "저장 공간이 부족해 오래된 대화 일부를 저장하지 못했습니다",
+  failed: "대화 목록을 저장하지 못했습니다 (브라우저 저장소를 쓸 수 없음)",
 };
 
 /**

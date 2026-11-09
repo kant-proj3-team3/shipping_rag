@@ -17,7 +17,7 @@ import {
   type Conversation,
   type Message,
 } from "../lib/chat";
-import { saveCurrentId } from "../lib/history";
+import { saveCurrentId, type SaveResult } from "../lib/history";
 import { logWarning } from "../lib/logger";
 import { sessionViewOf } from "../lib/session";
 
@@ -47,8 +47,8 @@ export interface UseChatResult {
   isChecking: boolean;
   /** 보고 있는 대화가 서버에서 만료됐다. 다음 질문은 새 대화로 시작한다 */
   isExpired: boolean;
-  /** 마지막 저장이 성공했는지 */
-  isStorageOk: boolean;
+  /** 마지막 저장 결과 */
+  saveResult: SaveResult;
   /** 방금 지워서 실행 취소할 수 있는 대화 */
   lastDeleted: Conversation | undefined;
   /** 보고 있는 대화에 질문을 보낸다. 받는 중 · 확인 중이거나 빈 질문이면 보내지 않고 false */
@@ -75,7 +75,7 @@ export interface UseChatResult {
 export function useChat(): UseChatResult {
   const api = useApi();
   const storage = useStorage();
-  const { history, historyRef, isStorageOk, updateHistory } = useChatHistory();
+  const { history, historyRef, saveResult, updateHistory } = useChatHistory();
   const {
     lastDeleted,
     remove: removeConversation,
@@ -223,7 +223,7 @@ export function useChat(): UseChatResult {
     isBusy: activeId !== undefined,
     isChecking: status === "checking",
     isExpired: status === "expired",
-    isStorageOk,
+    saveResult,
     lastDeleted,
     send,
     stop,
