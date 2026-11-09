@@ -1689,12 +1689,14 @@ source = { editable = "packages/retrieval" }
 dependencies = [
     { name = "common" },
     { name = "pydantic" },
+    { name = "qdrant-client" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "common", editable = "packages/common" },
     { name = "pydantic", specifier = ">=2.7" },
+    { name = "qdrant-client", specifier = ">=1.10" },
 ]
 
 [[package]]
