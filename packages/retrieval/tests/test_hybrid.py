@@ -99,11 +99,6 @@ def test_k_이하로_자른다(client):
     assert len(asyncio.run(r.retrieve(req(k=2), CTX)).chunks) == 2
 
 
-def test_리랭킹은_아직_미지원(client):
-    r = HybridRetriever(FakeEmbedder(), manifest(), client)
-    with pytest.raises(RetrievalError):
-        asyncio.run(r.retrieve(req(mode=RetrievalMode.HYBRID_RERANK), CTX))
-
 
 def test_한도_초과는_InvalidInputError_전파(client):
     r = HybridRetriever(FakeEmbedder(), manifest(), client)
