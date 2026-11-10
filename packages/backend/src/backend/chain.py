@@ -57,7 +57,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from pydantic import ValidationError
 
-from backend.prompts import ModelOutput, PromptVariant, RenderedPrompt, render_prompt
+from backend.prompts import HistoryTurn, ModelOutput, PromptVariant, RenderedPrompt, render_prompt
 from common.errors import ContractError
 from common.types import ErrorCode
 
@@ -332,10 +332,13 @@ class AnswerChain:
         context_text: str,
         variant: PromptVariant = PromptVariant.BASE,
         *,
+        history: Sequence[HistoryTurn] = (),
         callbacks: Sequence[BaseCallbackHandler] | None = None,
         attempt_limit: int | None = None,
     ) -> ChainResult:
         """모델을 불러 출력을 얻는다.
+
+        history: 같은 세션의 이전 대화(멀티턴, 오래된 것 → 최신 순). 비어 있으면 이전 대화 없는 프롬프트(단발)다.
 
         callbacks: LangChain 콜백(예: Langfuse CallbackHandler). 시도마다 그대로 넘긴다. 기록 장애를 막는 일은
             호출자(F)의 몫이며, 이 함수는 콜백이 있든 없든 같은 결과를 낸다.
@@ -344,7 +347,7 @@ class AnswerChain:
         예외: 모든 시도가 호출 실패면 ModelTimeoutError / ModelCallError. 응답은 받았는데 끝내 못 읽은 경우는
             예외가 아니라 `output=None` 인 결과로 돌려준다(D 가 output_invalid 로 처리).
         """
-        prompt = render_prompt(question, context_text, variant)
+        prompt = render_prompt(question, context_text, variant, history)
         max_attempts = self._config.max_attempts
         if attempt_limit is not None:
             max_attempts = max(1, min(max_attempts, attempt_limit))

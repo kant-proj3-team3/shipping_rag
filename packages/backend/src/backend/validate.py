@@ -44,7 +44,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 from backend.chain import AnswerChain, ChainResult
 from backend.context import ContextBuild
-from backend.prompts import ModelOutput, PromptVariant, RenderedPrompt
+from backend.prompts import HistoryTurn, ModelOutput, PromptVariant, RenderedPrompt
 from common.types import AnswerStatus, Citation, ContextItem
 
 ENV_MAX_REGENERATIONS = "OUTPUT_MAX_REGENERATIONS"
@@ -140,10 +140,14 @@ async def generate_validated(
     context: ContextBuild,
     variant: PromptVariant = PromptVariant.BASE,
     *,
+    history: Sequence[HistoryTurn] = (),
     callbacks: Sequence[BaseCallbackHandler] | None = None,
     max_regen: int | None = None,
 ) -> ValidationOutcome:
     """모델 호출 → 검증을 하고, 실패하면 제한 횟수만큼 다시 생성한다.
+
+    history: 같은 세션의 이전 대화(멀티턴). 재생성할 때도 같은 이력을 넣는다. 검증(출처 범위)은 이번 요청의 문맥만
+        기준이므로 이력은 검증에 영향을 주지 않는다.
 
     두 가지 상한이 함께 걸린다. ① 재생성 횟수 `max_regen`(기본: 환경변수 OUTPUT_MAX_REGENERATIONS).
     ② 요청 전체의 모델 호출 수 `chain.config.max_calls`(재시도·재생성 합). 둘 중 먼저 닿는 쪽에서 멈춘다.
@@ -165,7 +169,7 @@ async def generate_validated(
 
     while True:
         result: ChainResult = await chain.generate(
-            question, context.text, variant, callbacks=callbacks, attempt_limit=call_limit - calls
+            question, context.text, variant, history=history, callbacks=callbacks, attempt_limit=call_limit - calls
         )
         calls += result.attempts
         if result.input_tokens is None or result.output_tokens is None:
