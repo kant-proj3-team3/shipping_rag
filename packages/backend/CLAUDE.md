@@ -17,7 +17,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), LangChain 체인, 출�
 - 같은 `request_id`로 질문·검색 문서·실제 모델 입출력·시간·토큰을 Langfuse에 묶어 기록한다. 성공하면 `meta.trace_id`를 반드시 채운다. `cost_usd`·토큰은 모르면 `None`이다(0 금지).
 - `final_context`는 모델에 실제 전달한 문맥과 같아야 한다.
 - Redis 캐시 키에는 질문, `retrieval_mode`, `k`, `index_name`+`embedder_id`(`retriever.index`에서 읽는다), `manifest.fingerprint`(재색인 시 옛 답변 방지), 프롬프트 버전이 들어간다. 세션 이력을 프롬프트에 쓰면 이력도 키에 넣거나 캐시를 우회한다. 캐시 적중도 같은 스키마, `meta.cache_hit=True`.
-- 세션 ID는 클라이언트가 만든 UUID(`^[A-Za-z0-9_-]{8,128}$`). `answered`·`needs_clarification`·`abstained`만 turn으로 기록하고 `error`는 기록하지 않는다. 없거나 만료된 세션은 `None`→ 라우터가 404+`ApiError`.
+- 세션 ID는 클라이언트가 만든 UUID(`^[A-Za-z0-9_-]{8,128}$`). `answered`·`needs_clarification`·`abstained`만 turn으로 기록하고 `error`는 기록하지 않는다. 한 번도 기록되지 않은 세션은 `None`→ 라우터가 404+`ApiError`(세션은 만료되지 않는다).
 - `AnswerEvaluator`: 입력과 같은 순서·길이. 정답·채점 기준은 평가 호출에만 쓴다. 사실 주장 없음→`not_applicable`, 호출 실패→`unavailable`. 채점 호출의 시간·토큰은 서비스 `meta`에 합산하지 않는다.
 
 ## 주의

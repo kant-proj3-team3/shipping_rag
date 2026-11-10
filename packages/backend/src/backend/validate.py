@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from backend.chain import AnswerChain, ChainResult
+from backend.chain import AnswerGenerator, ChainResult
 from backend.context import ContextBuild
 from backend.prompts import HistoryTurn, ModelOutput, PromptVariant, RenderedPrompt
 from common.types import AnswerStatus, Citation, ContextItem
@@ -135,7 +135,7 @@ def validate_output(output: ModelOutput, items: Sequence[ContextItem]) -> Valida
 
 # ── 재생성을 포함한 생성+검증 ─────────────────────────────────────────
 async def generate_validated(
-    chain: AnswerChain,
+    chain: AnswerGenerator,
     question: str,
     context: ContextBuild,
     variant: PromptVariant = PromptVariant.BASE,

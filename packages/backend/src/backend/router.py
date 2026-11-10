@@ -71,7 +71,7 @@ def build_router(qa_service: QAService, session_service: SessionService, index: 
     ):
         info = await session_service.get(session_id, limit)
         if info is None:
-            err = ApiError(error_code=ErrorCode.SESSION_NOT_FOUND, message="세션이 없거나 만료되었습니다.")
+            err = ApiError(error_code=ErrorCode.SESSION_NOT_FOUND, message="세션을 찾을 수 없습니다.")  # 세션은 만료되지 않는다(계약 v0.1.1). 한 번도 기록되지 않은 세션뿐이다
             return JSONResponse(status_code=HTTP_SESSION_NOT_FOUND, content=err.model_dump(mode="json"))
         return info
 
