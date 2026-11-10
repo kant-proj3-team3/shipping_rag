@@ -270,20 +270,27 @@ class SessionQueryService:
 RedisSessionService = SessionQueryService  # G 단계의 이름(호환 별칭)
 
 
-def create_redis_session_store(*, client: Any | None = None) -> RedisSessionStore:
-    """환경변수(`REDIS_URL`, `SESSION_TTL_SECONDS`, `SESSION_MAX_TURNS`, `REDIS_TIMEOUT_S`)로 Redis 저장소를 만든다.
+def create_redis_client(*, timeout_s: float | None = None) -> Any:
+    """환경변수(`REDIS_URL`, `REDIS_TIMEOUT_S`)로 Redis 클라이언트를 만든다. 세션 저장소와 답변 캐시(`cache.py`)가 같이 쓴다.
 
     `from_url` 은 연결하지 않는다. 첫 명령 때 연결하므로 Redis 가 아직 없어도 여기서는 실패하지 않는다.
-    """
-    if client is None:
-        import redis
 
-        timeout = _env_float(ENV_REDIS_TIMEOUT, DEFAULT_REDIS_TIMEOUT_S)
-        url = os.environ.get(ENV_REDIS_URL, "").strip() or DEFAULT_REDIS_URL
-        client = redis.Redis.from_url(
-            url, decode_responses=True, socket_timeout=timeout, socket_connect_timeout=timeout
-        )
-    return RedisSessionStore(client)
+    timeout_s: 연결·명령 timeout(초). 없으면 `REDIS_TIMEOUT_S`(기본 2). 느려지면 없는 것보다 나쁜 용도(답변 캐시)는 짧게 준다.
+
+    알려진 함정: Redis 가 꺼져 있을 때 `redis://localhost` 는 실패까지 timeout 의 **두 배**가 걸린다. `localhost` 가 IPv6(`::1`)와
+    IPv4(`127.0.0.1`)로 풀려 두 주소를 차례로 시도하기 때문이다(Windows 에서 확인: timeout 0.5초일 때 `localhost` 1.05초,
+    `127.0.0.1` 0.51초. 재시도 때문이 아니다). 주소를 `127.0.0.1` 로 쓰면 한 번만 기다린다.
+    """
+    import redis
+
+    timeout = timeout_s if timeout_s is not None else _env_float(ENV_REDIS_TIMEOUT, DEFAULT_REDIS_TIMEOUT_S)
+    url = os.environ.get(ENV_REDIS_URL, "").strip() or DEFAULT_REDIS_URL
+    return redis.Redis.from_url(url, decode_responses=True, socket_timeout=timeout, socket_connect_timeout=timeout)
+
+
+def create_redis_session_store(*, client: Any | None = None) -> RedisSessionStore:
+    """환경변수(`REDIS_URL`, `SESSION_TTL_SECONDS`, `SESSION_MAX_TURNS`, `REDIS_TIMEOUT_S`)로 Redis 저장소를 만든다."""
+    return RedisSessionStore(client if client is not None else create_redis_client())
 
 
 def create_session_store(*, redis_client: Any | None = None, db: SessionBackend | None = None) -> PersistentSessionStore:
@@ -302,6 +309,7 @@ __all__ = [
     "RedisSessionService",
     "RedisSessionStore",
     "SessionQueryService",
+    "create_redis_client",
     "create_redis_session_store",
     "create_session_store",
     "session_max_turns",

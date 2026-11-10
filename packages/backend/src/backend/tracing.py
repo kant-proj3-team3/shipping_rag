@@ -54,6 +54,7 @@ ROOT_NAME = "qa-query"
 STEP_RETRIEVE = "retrieve"
 STEP_CONTEXT = "build-context"
 STEP_HISTORY = "load-history"  # 멀티턴: 세션 이력을 읽어 프롬프트에 넣을 이전 대화를 고르는 단계
+STEP_CACHE = "cache-lookup"  # 답변 캐시 조회. 적중하면 검색·모델 호출 단계는 생기지 않는다(이력이 있는 요청은 우회해서 이 단계도 없다)
 
 
 # ── 공개 인터페이스 ───────────────────────────────────────────────────
@@ -446,6 +447,7 @@ __all__ = [
     "create_tracer",
     "guard",
     "redact",
+    "STEP_CACHE",
     "STEP_HISTORY",
     "summarize_context",
     "summarize_history",
