@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import backend
+from backend.cache import RedisAnswerCache
 from backend.chain import AnswerChain, ModelCallError
 from backend.factory import (
     LazyAnswerChain,
@@ -44,6 +45,8 @@ def _clean_env(monkeypatch):
     # 개발자의 환경변수(키·실제 서버)가 테스트에 끼지 않게 한다
     for name in ("BACKEND_IMPL", "OPENAI_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"):
         monkeypatch.delenv(name, raising=False)
+    # 답변 캐시는 기본 켜짐이라 안 끄면 개발자 PC 의 실제 Redis 에 붙는다. 캐시 연결을 확인하는 테스트만 따로 켠다.
+    monkeypatch.setenv("CACHE_ENABLED", "false")
     shared_session_store.cache_clear()
     yield
     shared_session_store.cache_clear()
@@ -140,6 +143,42 @@ def test_an_injected_chain_is_not_warmed_up_or_replaced():
     chain = object()
     qa = create_real_qa_service(FakeRetriever(), chain=chain, store=object(), tracer=object())  # type: ignore[arg-type]
     assert qa._chain is chain
+
+
+# ── 답변 캐시(H) 연결 ──
+def test_real_service_wires_the_answer_cache_when_enabled(monkeypatch):
+    monkeypatch.setenv("CACHE_ENABLED", "true")
+    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=object(), tracer=object())  # type: ignore[arg-type]
+    assert isinstance(qa._cache, RedisAnswerCache)
+
+
+def test_real_service_wires_the_answer_cache_by_default(monkeypatch):
+    monkeypatch.delenv("CACHE_ENABLED", raising=False)  # 기본은 켜짐
+    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=object(), tracer=object())  # type: ignore[arg-type]
+    assert isinstance(qa._cache, RedisAnswerCache)
+
+
+@pytest.mark.parametrize("raw", ["false", "0", "no", "off", " FALSE "])
+def test_cache_is_off_when_disabled_by_environment(monkeypatch, raw):
+    monkeypatch.setenv("CACHE_ENABLED", raw)
+    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=object(), tracer=object())  # type: ignore[arg-type]
+    assert qa._cache is None  # 평가를 돌릴 때: 항상 새로 만든다
+
+
+def test_injected_cache_wins_over_the_environment(monkeypatch):
+    monkeypatch.setenv("CACHE_ENABLED", "true")
+    given = object()
+    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=object(), tracer=object(), cache=given)  # type: ignore[arg-type]
+    assert qa._cache is given
+    off = create_real_qa_service(FakeRetriever(), chain=object(), store=object(), tracer=object(), cache=None)  # type: ignore[arg-type]
+    assert off._cache is None  # None 은 명시적으로 끈다(환경변수가 켜져 있어도)
+
+
+def test_entrypoint_in_real_mode_follows_the_cache_environment(monkeypatch):
+    monkeypatch.setenv("BACKEND_IMPL", "real")
+    assert backend.create_qa_service(FakeRetriever())._cache is None  # fixture 가 CACHE_ENABLED=false 로 둔다
+    monkeypatch.setenv("CACHE_ENABLED", "true")
+    assert isinstance(backend.create_qa_service(FakeRetriever())._cache, RedisAnswerCache)
 
 
 # ── 조립은 연결하지 않는다 ──

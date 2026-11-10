@@ -37,6 +37,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 | `real` | 실제 QA 서비스(검색 → 문맥 → 모델 → 검증)와 PostgreSQL 원본 + Redis 캐시 세션. `OPENAI_API_KEY`·`DATABASE_URL`·`REDIS_URL`을 쓰고, `LANGFUSE_PUBLIC_KEY`·`LANGFUSE_SECRET_KEY`가 있으면 Langfuse에 기록한다 |
 
 - 답변 평가기(`create_answer_evaluator`)는 J 단계 전까지 `BACKEND_IMPL`과 상관없이 목업이다.
+- **답변 캐시**: 실제 모드는 `CACHE_ENABLED`가 꺼져 있지 않으면(기본 켜짐) `create_answer_cache()`를 주입한다. **평가를 돌릴 때는 꺼야 한다**(적중한 응답은 모델을 부르지 않아 시간·토큰 지표를 왜곡한다). 자세한 내용은 아래 "답변 캐시" 항목.
 - **세션 저장소는 프로세스 안에서 하나를 공유한다.** 두 진입점이 서로를 인자로 받지 않으므로 각자 만들면 DB 풀과 Redis 연결이 두 벌이 된다(`factory.shared_session_store()`). QA 서비스는 이 저장소에 턴을 기록하고(`sessions`) 같은 저장소에서 이전 대화를 읽는다(`history`, 멀티턴).
 - **모델 클라이언트는 시작 때 만들어 보고, 못 만들면 첫 요청 때 다시 시도한다.** `OPENAI_API_KEY`가 없으면 `ChatOpenAI`를 만들 때 실패하는데, 실패하면 앱을 못 띄우게 하면 키 하나 때문에 api 전체(`/health` 포함)가 안 뜬다. 그래서 시작 때 만들어 보되(`warm_up`) 실패해도 앱은 띄운다. 정상적으로는 첫 요청이 클라이언트 생성 시간(실측 약 0.75초)을 치르지 않는다. 못 만든 채로 요청이 오면 다시 시도하고, 또 못 만들면 그 요청만 `status=error`(`model_failed`, HTTP 502)로 돌려준다(계약: 예외를 던지지 않는다). 원인은 서버 로그에만 남기고(첫 번째만 스택) 사용자 응답에는 넣지 않는다. 실패는 기억하지 않고 요청마다 다시 시도하지만, 환경변수는 시작 때 읽히므로 고치려면 재시작해야 한다. 검색 결과가 없어 모델을 부르지 않는 요청(`abstained`)은 키 없이도 정상 응답한다.
 - 실제 모드로 api를 띄우려면 retrieval·chunking도 실제 구현이어야 의미가 있다(`CHUNKING_IMPL=real`, `RETRIEVAL_IMPL=real`, Qdrant 색인). 세 변수의 목록은 루트 `.env.example`에 있다.

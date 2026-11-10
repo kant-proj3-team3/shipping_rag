@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import Runnable
 
+from backend.cache import RedisAnswerCache
 from backend.chain import AnswerChain, ChainConfig
 from backend.factory import create_real_qa_service, create_real_session_service
 from backend.prompts import ModelOutput
@@ -117,7 +118,7 @@ def _store() -> PersistentSessionStore:
     return PersistentSessionStore(FakeDb(), cache)
 
 
-def _make(*llm_items, retriever=None, timeout_s=1.0, raise_server_exceptions=True):
+def _make(*llm_items, retriever=None, timeout_s=1.0, raise_server_exceptions=True, cache=None):
     llm = ScriptedLLM(*(llm_items or (_good(),)))
     retriever = retriever or FakeRetriever()
     store = _store()
@@ -126,6 +127,8 @@ def _make(*llm_items, retriever=None, timeout_s=1.0, raise_server_exceptions=Tru
         chain=AnswerChain(llm, ChainConfig(timeout_s=timeout_s, max_retries=0)),
         store=store,  # type: ignore[arg-type]
         tracer=NoopTracer(),  # 개발자 환경에 Langfuse 키가 있어도 테스트가 기록을 보내지 않게 한다
+        # 기본은 캐시 끔(None): 안 주면 환경변수를 따라 개발자 PC 의 실제 Redis 에 붙어 테스트끼리 같은 질문을 공유한다.
+        cache=cache,
     )
     app = FastAPI()
     app.include_router(build_router(qa, create_real_session_service(store=store), MANIFEST))  # type: ignore[arg-type]
@@ -277,7 +280,7 @@ def test_session_read_failure_is_500_not_404():
             raise ConnectionError("store down")
 
     app = FastAPI()
-    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=_store(), tracer=NoopTracer())  # type: ignore[arg-type]
+    qa = create_real_qa_service(FakeRetriever(), chain=object(), store=_store(), tracer=NoopTracer(), cache=None)  # type: ignore[arg-type]
     app.include_router(build_router(qa, create_real_session_service(store=Broken()), MANIFEST))  # type: ignore[arg-type]
     # "없음"(404)과 "조회 실패"를 섞지 않는다: 클라이언트가 세션이 사라졌다고 오해해 새 세션을 시작하지 않게
     assert TestClient(app, raise_server_exceptions=False).get(f"/session/{SID}").status_code == 500
@@ -307,6 +310,40 @@ def test_query_without_session_id_is_single_turn_and_records_nothing():
     client.post("/query", json={"question": "질문1"})
     client.post("/query", json={"question": "질문2"})
     assert "[이전 대화]" not in llm.user(1)
+
+
+# ── 답변 캐시(HTTP) ──
+def _memory_cache():
+    return RedisAnswerCache(fakeredis.FakeRedis(server=fakeredis.FakeServer(), decode_responses=True), ttl_s=60)
+
+
+def test_repeated_question_is_served_from_the_cache_over_http():
+    client, llm, retriever = _make(cache=_memory_cache())
+    first = client.post("/query", json={"question": "보관료 무료기간은?"})
+    second = client.post("/query", json={"question": "보관료 무료기간은?"})
+
+    assert first.json()["meta"]["cache_hit"] is False and second.json()["meta"]["cache_hit"] is True
+    assert len(llm.calls) == 1 and len(retriever.requests) == 1  # 적중하면 검색도 모델 호출도 하지 않는다
+    a, b = first.json(), second.json()
+    assert (b["status"], b["answer"], b["citations"]) == (a["status"], a["answer"], a["citations"])  # 같은 스키마
+    assert b["request_id"] != a["request_id"] and b["meta"]["input_tokens"] is None  # 새 요청, 토큰은 None
+    assert "final_context" not in b  # 적중해도 평가 입력은 응답에 내보내지 않는다
+
+
+def test_a_failed_answer_is_not_cached_over_http():
+    client, llm, _ = _make(RuntimeError("boom"), _good(), cache=_memory_cache())
+    assert client.post("/query", json={"question": "질문"}).status_code == 502
+    ok = client.post("/query", json={"question": "질문"})  # 같은 질문: 실패가 고정되지 않는다
+    assert ok.status_code == 200 and ok.json()["meta"]["cache_hit"] is False
+
+
+def test_cache_hit_still_records_the_turn_in_the_session_over_http():
+    client, _, _ = _make(cache=_memory_cache())
+    client.post("/query", json={"question": "질문", "session_id": "session-aaaa"})
+    hit = client.post("/query", json={"question": "질문", "session_id": "session-bbbb"})  # 다른 세션의 같은 첫 질문
+
+    assert hit.json()["meta"]["cache_hit"] is True
+    assert client.get("/session/session-bbbb").json()["turn_count"] == 1  # 적중해도 대화 이력에는 남는다
 
 
 # ── 조립 통로: 기본 세션 저장소 팩토리가 연결 없이 만들어진다 ──

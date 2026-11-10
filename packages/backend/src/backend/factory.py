@@ -22,6 +22,12 @@
 약 0.75초)을 치르지 않는다. 못 만든 경우에는 요청 때 다시 시도하고, 또 못 만들면 `ModelCallError` 를 내서 QAService 가
 `status=error`(`model_failed`, 502)로 돌려준다(계약: 예외를 던지지 않는다). 원인은 서버 로그에 남기고 사용자 응답에는 넣지
 않는다. 실패는 기억하지 않고 요청마다 다시 시도한다(환경변수는 시작 때 읽히므로 고치려면 재시작이 필요하다).
+
+답변 캐시(H)는 `CACHE_ENABLED` 가 꺼져 있지 않으면 쓴다
+------------------------------------------------------
+실제 모드의 QA 서비스는 `CACHE_ENABLED`(기본 켜짐)가 `false`·`0`·`no`·`off` 가 아니면 `create_answer_cache()` 를 주입한다. 연결은
+첫 사용 때 만들어지므로 Redis 가 없어도 앱은 뜨고, 캐시를 못 읽으면 캐시 없이 응답한다. **평가를 돌릴 때는 꺼야 한다**(적중한
+응답은 모델을 부르지 않아 시간·토큰 지표를 왜곡한다). 테스트에서는 `cache=` 로 가짜(또는 `None` = 명시적으로 끔)를 넣는다.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
 
+from backend.cache import AnswerCache, cache_enabled, create_answer_cache
 from backend.chain import AnswerChain, ChainConfig, ChainResult, ModelCallError, create_answer_chain
 from backend.prompts import HistoryTurn, PromptVariant
 from backend.qa import BackendQAService
@@ -42,6 +49,8 @@ from backend.tracing import Tracer, create_tracer
 from common.interfaces import Retriever
 
 logger = logging.getLogger(__name__)
+
+_UNSET: Any = object()  # `cache` 인자를 주지 않았다 = 환경변수(`CACHE_ENABLED`)를 따른다. `None` 은 명시적으로 끄는 것이다
 
 
 class LazyAnswerChain:
@@ -114,19 +123,27 @@ def create_real_qa_service(
     chain: Any | None = None,
     store: PersistentSessionStore | None = None,
     tracer: Tracer | None = None,
+    cache: AnswerCache | None = _UNSET,
 ) -> BackendQAService:
-    """실제 QA 서비스. 인자는 테스트에서 가짜를 넣는 자리이고, 진입점은 `retriever` 만 준다."""
+    """실제 QA 서비스. 인자는 테스트에서 가짜를 넣는 자리이고, 진입점은 `retriever` 만 준다.
+
+    cache: 안 주면 `CACHE_ENABLED` 를 따른다(기본 켜짐). `None` 은 명시적으로 끈다. 객체를 주면 그것을 쓴다.
+    """
     sessions = store if store is not None else shared_session_store()
     if chain is None:
         lazy = LazyAnswerChain()
         lazy.warm_up()  # 앱 시작 때 만들어 본다. 실패해도 앱은 뜨고 첫 요청 때 다시 시도한다
         chain = lazy
+    if cache is _UNSET:
+        # 답변 캐시(H): 기본은 켜짐이고 `CACHE_ENABLED=false` 로 끈다. 연결은 첫 사용 때 만들어져 Redis 가 없어도 여기서는 실패하지 않는다.
+        cache = create_answer_cache() if cache_enabled() else None
     return BackendQAService(
         retriever,
         chain,
         sessions,
         history=sessions,  # 멀티턴: 기록하는 저장소에서 이전 대화를 읽는다
         tracer=tracer if tracer is not None else create_tracer(),
+        cache=cache,
     )
 
 
