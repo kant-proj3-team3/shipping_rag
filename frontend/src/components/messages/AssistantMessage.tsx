@@ -13,7 +13,7 @@ interface AssistantMessageProps {
 function PendingMessage() {
   return (
     <div className="flex items-center gap-3">
-      <SealMascot />
+      <SealMascot isAnimated className="size-16 shrink-0" />
       <p className="text-sm text-zinc-500 dark:text-zinc-400">오늘도 해내는 중...</p>
     </div>
   );

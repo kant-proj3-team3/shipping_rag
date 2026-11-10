@@ -1,43 +1,60 @@
+import { useId } from "react";
+
+interface SealMascotProps {
+  /** 손 흔들기 · 눈 깜박임 같은 움직임. 끄면 멈춘 그림이다 (움직임 줄이기 설정에서는 켜도 멈춘다) */
+  isAnimated?: boolean;
+  /** 크기 · 배치 (예: "size-16") */
+  className?: string;
+}
+
 /**
- * 답변 대기 표시의 물개 그림: 머리띠를 두르고 양손을 번갈아 든다.
+ * 마스코트 물개 그림: 머리띠를 두르고 양손을 든 모습.
  *
- * 설명은 옆의 안내 문구가 맡으므로 스크린 리더에는 숨긴다. 움직임 줄이기 설정에서는 멈춘 그림으로 보인다.
+ * 옆의 글이 설명을 맡으므로 스크린 리더에는 숨긴다.
  */
-export function SealMascot() {
+export function SealMascot({ isAnimated = false, className = "" }: SealMascotProps) {
+  // 한 화면에 여러 개 그려도 그라데이션 · 마스크 id 가 겹치지 않게 한다.
+  // 겹치면 앞의 그림이 숨겨질 때 뒤 그림의 색이 사라진다. id 를 url() 에 넣으므로 영문 · 숫자만 남긴다
+  const prefix = `seal${useId().replace(/[^\w-]/g, "")}`;
+  const id = (name: string): string => `${prefix}-${name}`;
+  const url = (name: string): string => `url(#${id(name)})`;
+  // 멈춘 그림은 안쪽 움직임을 모두 끈다 (motion-safe 애니메이션보다 앞서도록 important)
+  const stillClass = isAnimated ? "" : "[&_*]:animate-none!";
+
   return (
-    <svg viewBox="0 0 128 128" aria-hidden="true" className="size-16 shrink-0">
+    <svg viewBox="0 0 128 128" aria-hidden="true" className={`${className} ${stillClass}`}>
       <defs>
-        <linearGradient id="seal-fade-ramp" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={id("fade-ramp")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0.76" stopColor="#ffffff" />
           <stop offset="1" stopColor="#000000" />
         </linearGradient>
-        <mask id="seal-fade" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
-          <rect width="128" height="128" fill="url(#seal-fade-ramp)" />
+        <mask id={id("fade")} maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+          <rect width="128" height="128" fill={url("fade-ramp")} />
         </mask>
-        <clipPath id="seal-mouth">
+        <clipPath id={id("mouth")}>
           <path d="M48.5 78C52 77.5 57 74 59 71c2 3 5 5 8.5 5.5C67 84 62 91.5 56 91.5c-5.5 0-8.5-7.5-7.5-13.5Z" />
         </clipPath>
-        <linearGradient id="seal-fur" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={id("fur")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
           <stop offset="0.65" stopColor="#fbfafb" />
           <stop offset="1" stopColor="#e6e4f2" />
         </linearGradient>
-        <linearGradient id="seal-paw" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={id("paw")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
           <stop offset="1" stopColor="#e9e7f4" />
         </linearGradient>
-        <linearGradient id="seal-band" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={id("band")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#3f73e6" />
           <stop offset="1" stopColor="#2450c2" />
         </linearGradient>
-        <radialGradient id="seal-iris" cx="0.5" cy="0.85" r="0.75">
+        <radialGradient id={id("iris")} cx="0.5" cy="0.85" r="0.75">
           <stop offset="0" stopColor="#4a6fc9" />
           <stop offset="1" stopColor="#1b1a33" />
         </radialGradient>
-        <path id="seal-band-line" d="M35 29.5C58 27 86 37 108 53" />
+        <path id={id("band-line")} d="M35 29.5C58 27 86 37 108 53" />
       </defs>
 
-      <g mask="url(#seal-fade)">
+      <g mask={url("fade")}>
         <g fill="#ffd84a" stroke="#f2a93b" strokeWidth="1.2">
           <g className="origin-center transform-fill motion-safe:animate-seal-spark">
             <rect
@@ -73,7 +90,7 @@ export function SealMascot() {
 
         <g className="origin-[64px_128px] transform-view motion-safe:animate-seal-bob">
           <path
-            fill="url(#seal-fur)"
+            fill={url("fur")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M2 130V84C3 70 6 56 14 44 24 20 50 3 76 3c22 0 37 14 44 35 5 18 6 46 6 92Z"
@@ -107,7 +124,7 @@ export function SealMascot() {
               cy="54.6"
               rx="9.6"
               ry="10.2"
-              fill="url(#seal-iris)"
+              fill={url("iris")}
               transform="rotate(12 37.5 54.6)"
             />
             <circle cx="35.5" cy="50.3" r="3.2" fill="#ffffff" />
@@ -135,7 +152,7 @@ export function SealMascot() {
             strokeLinejoin="round"
             d="M48.5 78C52 77.5 57 74 59 71c2 3 5 5 8.5 5.5C67 84 62 91.5 56 91.5c-5.5 0-8.5-7.5-7.5-13.5Z"
           />
-          <g clipPath="url(#seal-mouth)">
+          <g clipPath={url("mouth")}>
             <path fill="#f08c84" d="M47 87c3-5 15-7 21-3v9H47Z" />
           </g>
           <path
@@ -163,7 +180,7 @@ export function SealMascot() {
           </g>
 
           <path
-            fill="url(#seal-band)"
+            fill={url("band")}
             stroke="#14224f"
             strokeWidth="2"
             strokeLinejoin="round"
@@ -180,7 +197,7 @@ export function SealMascot() {
             d="M120.5 42C122 48 122.2 58 120.3 69L119.8 74.2C121 71.6 122 68.8 122.7 65.5 123.3 64 123.6 62.5 123.8 60.2 124.6 58 124.6 55.5 123.9 53 124.5 51 124.4 49 123.4 46.6 122.6 45 121.6 43.4 120.5 42Z"
           />
           <text fontSize="10.5" fontWeight="800" fill="#ffffff">
-            <textPath href="#seal-band-line">오늘도 해내자!</textPath>
+            <textPath href={`#${id("band-line")}`}>오늘도 해내자!</textPath>
           </text>
           <g fill="#ffffff">
             <ellipse cx="113.8" cy="53" rx="3.3" ry="2.7" />
@@ -193,7 +210,7 @@ export function SealMascot() {
 
         <g className="origin-[14px_95px] transform-view motion-safe:animate-seal-pump">
           <path
-            fill="url(#seal-paw)"
+            fill={url("paw")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M1 84C3 75 11 69 18 70c8 2 12 10 11 17-1 5-4 9-8 10-7 2-14 1-19-3-2-3-2-7-1-10Z"
@@ -209,7 +226,7 @@ export function SealMascot() {
 
         <g className="origin-[98px_120px] transform-view motion-safe:animate-seal-pump-late">
           <path
-            fill="url(#seal-paw)"
+            fill={url("paw")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M77 102c1-8 9-12.5 19-12.5 10 .5 20 6.5 22 16.5 1 8-2 14-6 18-12 3-26 1-31-6-3-5-4.5-11-4-16Z"

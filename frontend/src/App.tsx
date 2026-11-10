@@ -5,6 +5,7 @@ import { ChatView } from "./components/ChatView";
 import { Composer } from "./components/Composer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RetrievalModeSelect } from "./components/RetrievalModeSelect";
+import { SealMascot } from "./components/SealMascot";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarDrawer } from "./components/SidebarDrawer";
 import { ThemeSelect } from "./components/ThemeSelect";
@@ -136,6 +137,8 @@ export function App() {
               ☰
             </button>
           ) : null}
+          {/* 제목과 함께 좁은 화면에서는 숨긴다 (머리줄이 두 줄로 늘어난다) */}
+          <SealMascot className="size-8 shrink-0 max-md:hidden" />
           {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
           <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
