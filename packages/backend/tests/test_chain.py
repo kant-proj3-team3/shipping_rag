@@ -254,10 +254,12 @@ def test_result_is_same_with_or_without_callbacks():
 
 
 def test_prompt_with_braces_is_not_treated_as_template():
-    # 시스템 프롬프트의 JSON 예시({"status": ...})가 템플릿 변수로 읽히지 않고 그대로 전달된다.
+    # 질문·문맥에 중괄호({status}, {"a": 1})가 있어도 템플릿 변수로 읽히지 않고 그대로 전달된다.
+    # (시스템 프롬프트에서 JSON 예시를 없앤 뒤에도 문맥 쪽에서 같은 위험이 남는다.)
     llm = FakeLLM(_msg(GOOD))
-    run(_chain(llm).generate("q", "c"))
-    assert '{"status"' in llm.last_messages[0].content
+    run(_chain(llm).generate("{question} 은?", '표 {status} {"a": 1}'))
+    user = llm.last_messages[1].content
+    assert "{question}" in user and '{status} {"a": 1}' in user
 
 
 # ── 호출 수 상한 인자(검증 단계가 요청 전체 호출 수를 지키려고 넘긴다) ──

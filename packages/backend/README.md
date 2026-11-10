@@ -39,7 +39,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 
 ## 주요 설계 결정
 
-- 모델 호출(`chain.py`): 모델은 `json_schema`(strict) 구조화 출력으로 `ModelOutput` 스키마를 강제받는다(Chat Completions 고정). 재시도는 별도 요청이 아니라 같은 요청의 일부다. 호출 실패와 읽을 수 없는 출력(`parsed=None`)을 같은 시도 예산으로 다시 시도하고, 토큰은 응답을 받은 시도만 합산한다(하나라도 사용량이 없으면 `None`). 끝내 응답이 없으면 `ModelTimeoutError`/`ModelCallError`, 응답은 있으나 못 읽으면 `ChainResult.output=None`으로 돌려주고 `output_invalid` 판단은 검증 단계가 한다. 스키마가 입력 토큰을 약 20% 늘린다.
+- 모델 호출(`chain.py`): 모델은 `json_schema`(strict) 구조화 출력으로 `ModelOutput` 스키마를 강제받는다(Chat Completions 고정). 재시도는 별도 요청이 아니라 같은 요청의 일부다. 호출 실패와 읽을 수 없는 출력(`parsed=None`)을 같은 시도 예산으로 다시 시도하고, 토큰은 응답을 받은 시도만 합산한다(하나라도 사용량이 없으면 `None`). 끝내 응답이 없으면 `ModelTimeoutError`/`ModelCallError`, 응답은 있으나 못 읽으면 `ChainResult.output=None`으로 돌려주고 `output_invalid` 판단은 검증 단계가 한다. 스키마가 입력 토큰을 약 20% 늘린다. 출력 형식과 필드 설명은 `ModelOutput`(스키마)이 맡고 시스템 프롬프트에는 적지 않는다(프롬프트 버전 `v2`).
 - 출력 검증(`validate.py`): 출처는 모델이 쓴 문서명·페이지가 아니라 이번 요청의 문맥(`Chunk`)에서 코드가 채운다. 범위 밖 `source_id`는 항상 거부하고, `abstained`의 출처는 범위 안이면 허용한다. 여러 페이지에 걸친 청크는 페이지마다 `Citation`을 만든다. 검증이 끝내 실패하면 예외 없이 실패 이유를 돌려주고 `output_invalid`로 바꾸는 일은 QA 서비스가 한다.
 - Langfuse 기록(`tracing.py`): 요청 하나가 trace 하나다. 트리는 `qa-query`(질문 → status·answer·citations, 메타에 request_id·토큰·시간·오류 코드) 아래에 `retrieve`(순위·점수·chunk_id 전부), `build-context`(예산 적용 전후, S번호↔chunk_id, 제외된 chunk_id), `generate-answer`(LangChain 콜백이 만든 모델 호출 단계)가 붙는다. 검색에는 있는데 `dropped_chunk_ids`에 있으면 문맥 축소로 빠진 것이고, 처음부터 없으면 검색 단계 문제다.
   - `trace_id`는 `request_id`를 씨앗으로 만들어(같은 요청은 같은 trace) **로컬에서 만든 식별자**다. 전송은 SDK가 백그라운드로 하므로 `meta.trace_id`는 "기록을 시작했다"는 뜻이고, 서버 도착은 아래 확인 방법으로 본다. 기록을 시작하지 못하면 `None`이다.
