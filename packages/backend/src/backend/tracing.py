@@ -53,6 +53,7 @@ ENV_TRACING_ENABLED = "LANGFUSE_TRACING_ENABLED"  # SDK 가 쓰는 이름 그대
 ROOT_NAME = "qa-query"
 STEP_RETRIEVE = "retrieve"
 STEP_CONTEXT = "build-context"
+STEP_HISTORY = "load-history"  # 멀티턴: 세션 이력을 읽어 프롬프트에 넣을 이전 대화를 고르는 단계
 
 
 # ── 공개 인터페이스 ───────────────────────────────────────────────────
@@ -122,6 +123,11 @@ def summarize_context(
         "final_context": [{"source_id": i.source_id, "chunk_id": i.chunk.chunk_id} for i in items],
         "dropped_chunk_ids": list(dropped_chunk_ids),
     }
+
+
+def summarize_history(count: int, max_turns: int) -> dict[str, Any]:
+    """이전 대화 요약. 질문·답 본문은 넣지 않는다(실제 모델 입력에서 보인다)."""
+    return {"count": count, "max_turns": max_turns}
 
 
 def summarize_response(response: QueryResponse) -> dict[str, Any]:
@@ -440,7 +446,9 @@ __all__ = [
     "create_tracer",
     "guard",
     "redact",
+    "STEP_HISTORY",
     "summarize_context",
+    "summarize_history",
     "summarize_response",
     "summarize_retrieved",
 ]
