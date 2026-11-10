@@ -3,7 +3,7 @@
  *
  * 설명은 옆의 안내 문구가 맡으므로 스크린 리더에는 숨긴다. 움직임 줄이기 설정에서는 멈춘 그림으로 보인다.
  */
-export function SealLoader() {
+export function SealMascot() {
   return (
     <svg viewBox="0 0 128 128" aria-hidden="true" className="size-16 shrink-0">
       <defs>

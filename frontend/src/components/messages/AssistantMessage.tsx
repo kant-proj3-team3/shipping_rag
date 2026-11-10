@@ -1,8 +1,8 @@
 import { AnswerCard } from "./AnswerCard";
 import { ErrorMessage } from "./ErrorMessage";
-import { SealLoader } from "./SealLoader";
 import type { AnswerMessage } from "../../lib/chat";
 import { REQUEST_ERROR_TEXT } from "../../lib/labels";
+import { SealMascot } from "../SealMascot";
 
 interface AssistantMessageProps {
   message: AnswerMessage;
@@ -13,7 +13,7 @@ interface AssistantMessageProps {
 function PendingMessage() {
   return (
     <div className="flex items-center gap-3">
-      <SealLoader />
+      <SealMascot />
       <p className="text-sm text-zinc-500 dark:text-zinc-400">오늘도 해내는 중...</p>
     </div>
   );

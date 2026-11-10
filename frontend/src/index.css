@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* 답변 대기 표시의 물개 움직임 (SealLoader). 주기를 맞추고 시작 시점만 어긋나게 둔다 */
+  /* 답변 대기 표시의 물개 움직임 (SealMascot). 주기를 맞추고 시작 시점만 어긋나게 둔다 */
   --animate-seal-bob: seal-bob 1.2s ease-in-out infinite;
   --animate-seal-pump: seal-pump 1.2s ease-in-out infinite;
   --animate-seal-pump-late: seal-pump 1.2s ease-in-out -0.6s infinite;
