@@ -26,6 +26,7 @@ from common.types import (
     SessionTurn,
 )
 
+from ..tracing import redact
 from .session import InMemorySessionStore
 
 DEFAULT_MODE = RetrievalMode.HYBRID
@@ -123,7 +124,7 @@ class MockQAService:
                 SessionTurn(
                     request_id=ctx.request_id,
                     asked_at=datetime.now(UTC),
-                    question=request.question,
+                    question=redact(request.question),  # 계약 v0.1.1: 기록하는 question 은 이메일·키 모양을 가린다
                     retrieval_mode=mode,
                     status=status,
                     answer=answer,

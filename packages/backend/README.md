@@ -1,8 +1,8 @@
 # backend
 
-FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → 프롬프트·모델 호출 → 검증 → 출처 매핑을 하는 QA 서비스, Redis 캐시·세션, Langfuse 기록, 답변 품질 평가를 맡는다. 검색 구현과 청킹은 하지 않는다.
+FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → 프롬프트·모델 호출 → 검증 → 출처 매핑을 하는 QA 서비스, PostgreSQL 세션 이력(원본)과 Redis 캐시·세션 조회 캐시, Langfuse 기록, 답변 품질 평가를 맡는다. 검색 구현과 청킹은 하지 않는다.
 
-> 현재 상태: **구현 진행 중**. 라우터는 실제 계약(경로·모델·HTTP 상태)대로 동작한다. 실제 QA 서비스(`qa.py`: 검색 → 문맥 → 모델 → 검증), Langfuse 기록(`tracing.py`), Redis 세션(`session.py`)은 구현됐지만, `create_qa_service`와 `create_session_service`는 아직 `src/backend/mock/`의 목업을 돌려준다(전환은 I 단계). 평가는 목업이고 캐시는 아직 없다. 진행 현황은 [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+> 현재 상태: **구현 진행 중**. 라우터는 실제 계약(경로·모델·HTTP 상태)대로 동작한다. 실제 QA 서비스(`qa.py`: 검색 → 문맥 → 모델 → 검증), Langfuse 기록(`tracing.py`), 세션(`session.py`·`session_db.py`: PostgreSQL 원본 + Redis 캐시)은 구현됐지만, `create_qa_service`와 `create_session_service`는 아직 `src/backend/mock/`의 목업을 돌려준다(전환은 I 단계). 평가는 목업이고 캐시는 아직 없다. 진행 현황은 [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
 
 ## 공개 인터페이스
 
@@ -21,7 +21,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 - 검색 결과가 비면 모델을 호출하지 않고 `abstained`로 답한다.
 - 모델 출력은 코드로 검증한다. 문서명·페이지는 모델이 아니라 코드가 `Chunk`에서 채운다. `status=error`는 코드만 부여하고, 예외는 던지지 않고 `status=error`+`error_code`로 돌려준다.
 - `meta`의 토큰·비용·`trace_id`는 확인된 값만 채운다(모르면 `None`, 0 금지). `final_context`는 모델에 실제 전달한 문맥과 같다.
-- 세션은 `answered`·`needs_clarification`·`abstained`만 기록하고 `error`는 기록하지 않는다. 없거나 만료된 세션은 404 + `ApiError`.
+- 세션은 `answered`·`needs_clarification`·`abstained`만 기록하고 `error`는 기록하지 않는다. 한 번도 기록되지 않은 세션은 404 + `ApiError`(세션은 만료되지 않는다). 기록하는 질문은 이메일·API 키 모양을 가린 값이다(`qa.py`가 `redact`를 적용).
 - 캐시 키에는 질문·`retrieval_mode`·`k`·`index_name`+`embedder_id`·프롬프트 버전이 들어간다. 세션 이력을 프롬프트에 쓰면 이력도 키에 넣거나 캐시를 우회한다.
 - 검색된 문서의 문장은 지시가 아니라 데이터다(`security` 문항의 공격 문구).
 
@@ -32,7 +32,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 | 클래스 | 동작 |
 |---|---|
 | `MockQAService` | LLM 없이 1위 청크를 그대로 답으로 쓴다. 질문이 4자 미만이면 `needs_clarification`. 검색 예외를 `error_code`로 변환하고 세션에 기록한다 |
-| `MockSessionService` | 프로세스 메모리 저장소(`InMemorySessionStore`)를 `QAService`와 공유한다 (실제는 Redis) |
+| `MockSessionService` | 프로세스 메모리 저장소(`InMemorySessionStore`)를 `QAService`와 공유한다 (실제는 PostgreSQL + Redis) |
 | `MockAnswerEvaluator` | 채점하지 않는다. 답변은 `unavailable`, 오류 응답도 `unavailable`(평균 제외), 사실 주장이 없는 응답은 `not_applicable` |
 
 라우터(`router.py`)는 목업이 아니라 실제 구현이다. `/query`의 `status=error`는 `ERROR_HTTP_STATUS`로 HTTP 상태를 바꾸고, `final_context`는 응답에 내보내지 않는다.
@@ -46,14 +46,20 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
   - 장애 격리: 트레이서는 항상 예외를 모두 잡는 래퍼로 감싸진다. Langfuse가 꺼져 있거나 SDK가 예외를 내도 응답은 그대로 나가고 `trace_id=None`이다. 요청 경로에서 `flush()`를 부르지 않는다.
   - 마스킹: 전송 직전에 모든 문자열 속성에서 이메일과 API 키(환경에 설정된 키 값 자체 포함)를 가린다. 정규식이라 이름·주소 같은 다른 개인정보는 막지 못한다. 질문 원문은 이 규칙만 적용해 남긴다.
   - `cost_usd`는 채우지 않는다(`None`). 서버가 계산하는 비용은 응답 시점에 알 수 없고, 임의 단가를 쓰지 않는다.
-- Redis 세션(`session.py`): 세션 하나가 키 두 개다. `rag:session:{id}:meta`(hash: 생성·마지막 활동 시각, 전체 턴 수)와 `rag:session:{id}:turns`(list: `SessionTurn` JSON, 오래된 것 → 최신 순). 기록은 한 트랜잭션으로 두 키를 함께 갱신하고 TTL을 다시 건다(마지막 활동 기준 만료, 조회는 TTL을 늘리지 않는다). 모든 키에 TTL이 있다(compose의 Redis는 `volatile-lru`라 TTL 없는 키는 지워지지 않는다).
+- **세션 이력 영구 저장(G2, `session.py`·`session_db.py`)**: PostgreSQL이 원본이고 Redis는 조회 캐시다. 이력은 만료되지 않는다(`expires_at`은 항상 `null`).
+  - 테이블: `rag_sessions`(세션 한 행: 생성·마지막 활동 시각, 전체 턴 수)와 `rag_session_turns`(턴 한 행: `(session_id, seq)` 키, `SessionTurn` JSON). 기록은 한 트랜잭션에서 세션 행을 upsert하며 턴 수를 올리고(행 잠금) 그 값을 순번으로 쓰므로 같은 세션에 동시에 기록해도 순번이 겹치거나 빠지지 않는다.
+  - 쓰기는 DB 먼저, 성공하면 Redis 캐시를 **무효화(삭제)**한다. 조회는 Redis 우선이고 없으면 DB에서 읽어 캐시를 채운다(캐시가 보관하는 턴이 요청한 `limit`보다 적으면 DB). Redis만 증분 갱신하면 TTL이 지난 뒤 카운터가 1부터 다시 시작해 이력이 잘린 채 보여서 이 방식을 택했다.
+  - **DB 장애**: 기록이 실패하면 그 턴은 Redis에도 남기지 않고(둘이 어긋나지 않게) 예외를 낸다. `/query`는 응답을 그대로 내므로 **DB 장애 중의 턴은 저장되지 않는다**. 풀 timeout(`DATABASE_TIMEOUT_S`)만큼 그 요청이 늦어진다. 조회는 캐시에 있으면 DB가 꺼져도 읽히고, 캐시가 없고 DB도 실패하면 `None`이 아니라 예외다. 객체 생성과 앱 기동은 DB가 없어도 실패하지 않는다(연결은 첫 사용 때).
+  - **스키마 관리**: 마이그레이션 도구 없이 첫 사용 때 `CREATE TABLE IF NOT EXISTS`를 실행한다(여러 프로세스가 동시에 처음 쓸 때를 위해 advisory lock). 스키마가 바뀌는 시점에는 Alembic 같은 도구를 도입한다.
+  - 알려진 한계: DB가 오래 꺼져 있으면 요청마다 timeout만큼 늦어진다(차단기 없음). 조회가 DB를 읽는 사이 같은 세션에 기록이 들어오면 캐시가 한 턴 뒤처진 채 채워질 수 있다(다음 기록의 무효화나 TTL까지). 인증이 없어 세션 ID를 아는 사람은 영구 저장된 이력을 누구나 조회할 수 있다(UUID 추측 불가능성에만 기대며, 삭제 수단은 없다). 이메일·키 모양만 가리고 이름·주소 같은 다른 개인정보는 막지 못한다.
+- Redis 세션 캐시(`session.py`): 세션 하나가 키 두 개다. `rag:session:{id}:meta`(hash: 생성·마지막 활동 시각, 전체 턴 수)와 `rag:session:{id}:turns`(list: `SessionTurn` JSON, 오래된 것 → 최신 순). 기록은 한 트랜잭션으로 두 키를 함께 갱신하고 TTL을 다시 건다(마지막 활동 기준 만료, 조회는 TTL을 늘리지 않는다). 모든 키에 TTL이 있다(compose의 Redis는 `volatile-lru`라 TTL 없는 키는 지워지지 않는다).
   - `turn_count`는 목록 길이가 아니라 카운터라서, 보관 상한(`SESSION_MAX_TURNS`)을 넘겨 오래된 턴이 잘려도 전체 개수는 유지된다.
   - `session_id`는 키에 들어가므로 `SESSION_ID_PATTERN`에 맞는 값만 쓴다. 맞지 않으면 조회는 `None`, 기록은 `ValueError`(QAService가 기록 실패로 처리).
   - **장애 처리**: Redis가 꺼져 있어도 객체 생성과 앱 기동은 실패하지 않고(연결은 첫 명령 때), 소켓 timeout(`REDIS_TIMEOUT_S`)이 있어 멈춘 Redis에 오래 붙잡히지 않는다. 기록이 실패하면 `/query`는 세션 기록만 건너뛰고 응답한다. 조회(`GET /session`)가 실패하면 `None`(404)으로 바꾸지 않고 예외를 낸다(클라이언트가 세션이 사라졌다고 오해해 새 세션을 시작하지 않게). 이때 HTTP 응답은 FastAPI 기본 500이다(`ApiError` 형식이 아니다. 계약에 이 경우의 오류 코드가 없다).
   - 클라이언트가 동기라서 QAService와 `RedisSessionService`가 `asyncio.to_thread`로 이벤트 루프 밖에서 부른다. Redis가 멈춰도 다른 요청은 막히지 않지만, 세션 기록은 응답 전에 하므로 그 요청은 timeout까지 늦어진다.
   - 알려진 한계: 같은 세션에 여러 worker가 기록해도 Redis가 한 줄로 처리하므로 안전하지만, 요청이 거의 동시에 오면 턴 순서는 기록이 도착한 순서이고 `asked_at`과 다를 수 있다.
 - 아직 정하지 않은 것: 캐시 키 구성.
-- `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 둘 다 `REDIS_URL`을 읽는다.
+- `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 둘 다 `create_session_store()`로 같은 PostgreSQL(`DATABASE_URL`)과 Redis(`REDIS_URL`)를 본다.
 - 캐시 키의 `index_name`+`embedder_id`는 `retriever.index`에서 읽는다(`create_qa_service`가 `IndexManifest`를 따로 받지 않는다).
 
 ## 설정 (환경변수)
@@ -70,8 +76,11 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 | `OUTPUT_MAX_REGENERATIONS` | `1` | 출력 검증에 실패했을 때 다시 생성하는 최대 횟수. 0이면 재생성하지 않는다 |
 | `REDIS_URL` | `redis://localhost:6379/0` | 세션 Redis 주소. compose 안에서는 `redis://redis:6379/0`로 덮어쓴다 |
 | `REDIS_TIMEOUT_S` | `2` | Redis 연결·명령 timeout(초). 멈춘 Redis가 요청을 오래 붙잡지 않게 한다 |
-| `SESSION_TTL_SECONDS` | `86400` | 세션 만료(마지막 기록 기준, 초) |
-| `SESSION_MAX_TURNS` | `200` | 세션당 보관하는 최근 턴 수(넘으면 오래된 턴부터 지운다. `turn_count`는 유지) |
+| `DATABASE_URL` | `postgresql://rag:rag@localhost:5432/rag` | 세션 이력 원본(PostgreSQL). compose 안에서는 `postgres` 서비스 주소로 덮어쓴다. 기본값은 compose의 로컬 개발용 계정이다 |
+| `DATABASE_TIMEOUT_S` | `2` | DB 연결·풀 대기 timeout(초). 멈춘 DB가 요청을 오래 붙잡지 않게 한다 |
+| `DATABASE_POOL_MAX` | `4` | DB 연결 풀 최대 크기 |
+| `SESSION_TTL_SECONDS` | `86400` | Redis **캐시** 수명(마지막 기록·채움 기준, 초). 이력은 만료되지 않는다 |
+| `SESSION_MAX_TURNS` | `200` | Redis 캐시가 세션당 보관하는 최근 턴 수(DB는 전부 보관). 요청한 `limit`이 이보다 크면 DB에서 읽는다 |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | (없음) | 둘 다 있어야 기록한다. 없으면 기록 없이 동작한다. 커밋하지 않는다 |
 | `LANGFUSE_BASE_URL` 또는 `LANGFUSE_HOST` | `https://cloud.langfuse.com` | 프로젝트 지역 주소(EU `cloud`, US `us.cloud`, JP `jp.cloud`). SDK가 둘 다 읽는다(`BASE_URL` 우선) |
 | `LANGFUSE_TRACING_ENABLED` | `true` | `false`면 키가 있어도 기록하지 않는다 |
@@ -94,4 +103,4 @@ uv run pytest packages/backend
 uv run python scripts/export_openapi.py   # contracts/openapi.json 과 같은지 확인 (git diff)
 ```
 
-세션 테스트(`tests/test_session.py`)는 메모리 Redis(`fakeredis`, 루트 dev 의존성)로 돌아서 Redis 서버가 필요 없다. 실제 Redis에서 확인하려면 `docker compose up -d redis`로 띄우고 `REDIS_URL`을 가리킨 뒤 `create_session_store()`로 기록·조회해 본다.
+세션 테스트(`tests/test_session.py`)는 메모리 Redis(`fakeredis`, 루트 dev 의존성)로 돌아서 Redis 서버가 필요 없다. 실제 Redis에서 확인하려면 `docker compose up -d redis`로 띄우고 `REDIS_URL`을 가리킨 뒤 `create_redis_session_store()`로 기록·조회해 본다. DB 세션 테스트(`tests/test_session_db.py`)는 **실제 PostgreSQL**이 필요해서 `TEST_DATABASE_URL`이 없으면 건너뛴다(CI에는 DB 서비스가 없다). 로컬에서는 `docker compose up -d postgres` 뒤 `TEST_DATABASE_URL=postgresql://rag:rag@localhost:5432/rag uv run pytest packages/backend/tests/test_session_db.py`로 돌린다. 조합 저장소(`tests/test_session_persistent.py`)는 메모리 가짜 DB와 `fakeredis`로 돌아 서버가 필요 없다.
