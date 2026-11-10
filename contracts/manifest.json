@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "contract_version": "0.1.0",
-  "contract_hash": "sha256:6618688fa2fd53403c8c3de075f958585e26709e8fa427bf507baedf00caa92c",
+  "contract_version": "0.1.1",
+  "contract_hash": "sha256:f8329b5cedef2c629e67b325ef6f16bb2ccdd644e0a6d0cfea1e85199cd260a1",
   "sources": {
     "types.py": "sha256:b99cb45fc4ccedbde970d122ae1a03a00528e7a0760ead8aa48e65e55694b735",
-    "interfaces.py": "sha256:cd8e5bef0f03e87a22bdd0a4f0cea1589479c10601d43913006b09e64ed7d248",
+    "interfaces.py": "sha256:2763c54d996d2a942ec8bd77472816320f82d2e2229135d7b69ed1c6d7c188d6",
     "api.py": "sha256:af67f6fddc168a7167903f0204fcd65c059b6d2097bdecd850e6c7d2237186e6",
     "errors.py": "sha256:5c658ef835c263ef596fb9b8ca4aad67a830da79c893949ba847f016999997a6",
     "entrypoints.py": "sha256:47e587c566a263dccede6e164c0f2a0413fa0da6d2e71c48cad6221bd4c1d313"
@@ -313,7 +313,7 @@
   },
   "artifacts": {
     "contracts/openapi.json": "sha256:d3aae35d3fc5ef5e0190dd0002b6eb2bda52e9c707325498a86da26fe1ba0ddf",
-    "contracts/viewer.html": "sha256:9771c2f9fb3fcd40fc50a376cf3df465e94d5a899e7093ec1657d08ea9003d81",
+    "contracts/viewer.html": "sha256:d5bde1467aec2fb1a5a51d79955fecd34a35104548f8762635d0160a1fedc534",
     "contracts/examples/golden_item.json": "sha256:0c0d6b2e8ffcde787d453015800aa323ee85c8a1171e6eeb3d35df4a1cb74a67",
     "contracts/examples/health_ok.json": "sha256:03ac3a0c4d50c468ce6eb6b9a1f9e97196c77ac5f2a951c4d956985619cb1853",
     "contracts/examples/query_abstained.json": "sha256:3eca56f9681ad45a90cc701a7c83f6b731e450668a915271b571d22a69f0c5e6",
@@ -321,7 +321,7 @@
     "contracts/examples/query_error.json": "sha256:8aa3981c6f5877bcadc885221b9f188c07fc354058517b6acc180298aef7ed5d",
     "contracts/examples/query_needs_clarification.json": "sha256:a4b75ccd3255feb529c623271e2bfd4e27a945c65d43217284ea77600d6ac754",
     "contracts/examples/query_request.json": "sha256:9c9577c216bf5dc5f1c48867bba2af53999bb220c96b164b630117be8435461d",
-    "contracts/examples/session_info.json": "sha256:1f605e87dafbfb82e63af6a380fa73e33f779fb069e193a1782b86eba0309b4a",
-    "contracts/examples/session_not_found.json": "sha256:41ebb09d680f95eb3065a5daa6574c340f50f743f045eb9583d5d824c9372b73"
+    "contracts/examples/session_info.json": "sha256:8d88c72891a6b4e5377ff4f28ed9abf14a6b05113cd6d79f9a724f3b86f42e30",
+    "contracts/examples/session_not_found.json": "sha256:e7637440a9b27380eef440bd4cc67094c973e197ec8a0db9e3f599d8fd4e7e5e"
   }
 }
