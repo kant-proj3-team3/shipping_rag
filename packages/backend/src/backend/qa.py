@@ -47,6 +47,7 @@ from backend.tracing import (
     TraceStep,
     Tracer,
     guard,
+    redact,
     summarize_context,
     summarize_retrieved,
 )
@@ -115,7 +116,7 @@ def error_code_for(exc: BaseException) -> ErrorCode:
 
 
 class SessionRecorder(Protocol):
-    """턴을 기록하는 저장소(목업 메모리 저장소 또는 `RedisSessionStore`). 블로킹 호출이어도 된다: 서비스가 스레드로 부른다."""
+    """턴을 기록하는 저장소(목업 메모리 저장소 또는 `PersistentSessionStore`). 블로킹 호출이어도 된다: 서비스가 스레드로 부른다."""
 
     def append(self, session_id: str, turn: SessionTurn) -> None: ...
 
@@ -270,7 +271,7 @@ class BackendQAService:
                 turn = SessionTurn(
                     request_id=ctx.request_id,
                     asked_at=datetime.now(UTC),
-                    question=request.question,
+                    question=redact(request.question),  # 영구 저장하므로 이메일·키 모양을 가린다(계약 v0.1.1)
                     retrieval_mode=mode,
                     status=status,
                     answer=answer,

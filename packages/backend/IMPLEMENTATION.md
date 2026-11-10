@@ -13,9 +13,10 @@
 | C | LangChain 체인 | 1 | 완료(#9) |
 | D | 출력 검증·출처 매핑 | 1 | 완료(#13) |
 | E | 오류 매핑 | 1 | 완료(#15) |
-| F | Langfuse 트레이싱 | 2 | 구현 완료(PR 대기) |
-| G | Redis 세션 | 3 | 구현 완료(PR 대기) |
-| G2 | PostgreSQL 메시지 영구 저장 (계약 변경 동반) | 3 | 미착수(계약 결정 대기) |
+| F | Langfuse 트레이싱 | 2 | 완료(#18) |
+| G | Redis 세션 | 3 | 완료(#20) |
+| G2 | PostgreSQL 메시지 영구 저장 (계약 변경 동반) | 3 | 구현 완료(PR 대기). 계약은 #23(v0.1.1) |
+| G3 | 멀티턴(세션 이력을 프롬프트에 삽입) | 3 | 미착수(계약은 #23에 반영) |
 | H | Redis 캐시 | 3 | 미착수 |
 | I | 라우터·`create_*` 진입점 | 4 | 미착수 |
 | J | 답변 평가기 | 5 | 미착수 |
@@ -220,30 +221,39 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
 ### G2. PostgreSQL 메시지 영구 저장
 
 - **목적**: 질의응답 메시지를 PostgreSQL에 영구 저장한다. Redis 세션(G)의 TTL·보관 상한과 무관하게 이력이 남게 한다.
-- **전제**: **계약 변경을 동반한다.** `packages/common`·`contracts` 변경은 사람이 계약 변경 PR로 올린다(에이전트는 제안만 한다). 인터페이스를 바꿔야 하므로 구현보다 먼저 계약 PR을 `dev`에 반영하고, 영향받는 모듈(backend, frontend) 담당자의 승인을 받는다.
-- **내용(초안, 아래 결정이 정해지면 확정)**
-  - 질의응답이 끝날 때 메시지를 DB에 기록한다(`error` 응답은 G와 같은 규칙으로 제외할지 정한다).
-  - DB 접속은 환경변수(`DATABASE_URL`)로 읽는다. compose에 PostgreSQL 서비스와 named volume을 추가한다.
-  - 스키마 생성·변경 방식(마이그레이션 도구)과 드라이버를 정한다.
+- **전제**: **계약 변경을 동반한다.** `packages/common`·`contracts` 변경은 계약 변경 PR로 올리고 구현보다 먼저 `dev`에 반영한다. **반영됐다(#23, `CONTRACT_VERSION` 0.1.1).** 프런트엔드의 "서버에서 만료된 대화입니다" 안내 문구는 frontend 담당이 고친다(이 단위의 범위 밖).
+- **내용**
+  - 질의응답이 끝날 때 `SessionTurn`을 DB에 기록한다(`error` 응답은 G와 같이 기록하지 않는다).
+  - DB 접속은 환경변수(`DATABASE_URL`)로 읽는다. compose에 PostgreSQL 서비스와 named volume을 추가했다.
   - DB 장애가 응답 실패로 번지지 않게 한다(G·F와 같은 원칙).
+- **파일**: `src/backend/session_db.py`(PostgreSQL 저장소), `src/backend/session.py`(`PersistentSessionStore` 조합·팩토리), `qa.py`(질문 마스킹)
 - **결정한 것**
   - [x] **저장 범위**: `SessionTurn`(질문·답변·상태·출처·시각·`request_id`)을 저장한다. `SessionTurn`에 이미 `request_id`가 있어 **필드 추가는 없다**. 토큰·`trace_id` 등 `meta`는 저장하지 않는다(Langfuse가 가진다).
   - [x] **Redis와의 관계**: DB가 원본이고 Redis는 캐시다. 기록은 둘 다 하고 조회는 Redis 우선, 없으면 DB에서 읽는다. G의 `RedisSessionStore`는 이 캐시 역할로 쓴다.
   - [x] **만료 의미**: 만료 없음. `SessionInfo.expires_at`은 항상 `None`(이미 허용된 값)이고, 404는 세션이 한 번도 없었을 때만이다. Redis TTL은 캐시 수명일 뿐 사용자에게 보이지 않는다.
   - [x] **접근 제어**: 지금처럼 UUID 세션 ID만 쓴다(인증·소유자 없음). 영구 저장으로 노출 위험이 커진다는 점을 README에 적는다.
-- **아직 정하지 않은 것**
-  - [ ] 조회 API: 기존 `GET /session/{id}`만 유지하는지(기본안), 목록·삭제 경로를 추가하는지(추가하면 계약 변경이 커진다).
-  - [ ] 개인정보·보존: 질문 원문을 영구 저장하므로 삭제 요청 처리와 마스킹(Langfuse에는 `redact`를 적용하는데 DB에는?)을 정한다. 보존 기간은 "만료 없음"으로 정했으므로 별도 삭제 수단이 필요한지 본다.
-  - [ ] DB 장애 시 동작: 기록 실패를 삼키고 건너뛰면 Redis에만 있는 턴이 캐시가 만료되면 사라진다. 재시도·대기열을 둘지, 실패한 턴을 Redis에 남기지 않을지 정한다.
-  - [ ] 캐시 일관성: Redis에는 최근 `SESSION_MAX_TURNS`개만 있으므로, 요청한 `limit`이 캐시 길이보다 크고 DB에 더 있으면 DB에서 읽어야 한다(캐시 적중 판정 규칙).
-  - [ ] 드라이버와 스키마 관리(마이그레이션 도구)와 비동기 사용 방식.
-- **계약 변경 범위(제안, 사람이 PR로 올린다)**: 타입 변경은 필요 없다. 바뀌는 것은 의미와 문서다. 고칠 곳: `common/api.py:12`(404 주석)·`common/interfaces.py:199`(`SessionService` 독스트링 "없거나 만료된 세션은 None" → "없는 세션은 None"), `CONTRACTS.md` 78·150줄(세션 절·TTL 동의 항목), `contracts/examples/session_info.json`의 `expires_at`(null로)과 `session_not_found.json`의 문구("세션이 없거나 만료되었습니다."), `CONTRACT_VERSION`·`CHANGELOG`·manifest. 버전을 어떻게 올릴지(의미 변경이므로 minor 또는 patch)는 사람이 정한다. 프런트엔드는 404 처리가 그대로 동작하지만 "서버에서 만료된 대화입니다" 안내(`ChatView.tsx`, `useChat.ts`, `lib/session.ts`)의 문구는 영구 저장 뒤에 사실과 맞지 않게 되므로 frontend 담당과 맞춘다.
-- **완료 기준(초안)**
-  - [ ] 계약 변경 PR이 먼저 `dev`에 반영됐다(`CONTRACT_VERSION`·`CHANGELOG`·manifest, 목업 갱신).
-  - [ ] 메시지가 DB에 기록되고, Redis 만료·상한과 무관하게 조회된다.
-  - [ ] DB가 꺼져 있어도 `/query`가 정상 응답한다.
-  - [ ] 재시작·재배포 뒤에도 이력이 남는다(named volume).
-- **테스트(안)**: 메모리 DB 대신 실제 PostgreSQL(compose)로 통합 테스트를 하거나, 저장소 인터페이스를 가짜로 대체한 단위 테스트와 실제 DB 수동 확인을 병행한다(정하면 여기에 적는다).
+  - [x] **개인정보**: 기록하는 질문에는 `redact`(이메일·API 키 모양)를 적용한다. 대화 복원 때 입력 원문과 달라질 수 있다(계약 v0.1.1). 이름·주소 같은 다른 개인정보는 막지 못한다. **삭제 수단은 만들지 않는다**(인증이 없어 아무나 지울 수 있게 되고 계약·프런트 변경이 커진다).
+  - [x] **조회 API**: 기존 `GET /session/{id}`만 유지한다(목록·삭제 경로 없음).
+- **구현에서 정한 것**
+  - [x] **캐시 정합성**: 쓰기는 DB 먼저, 성공하면 Redis를 **무효화(삭제)**한다. 조회는 Redis 우선, 없으면 DB에서 읽어 채운다. Redis만 증분 갱신하면 TTL이 지난 뒤 카운터가 1부터 다시 시작해 이력이 잘린다(회귀 테스트 `test_history_survives_redis_expiry_and_new_turn`). 캐시가 보관한 턴이 요청한 `limit`보다 적으면(보관 상한) DB에서 읽는다.
+  - [x] **DB 장애 시 동작**: 기록이 실패하면 그 턴은 Redis에도 남기지 않고 예외를 낸다(둘이 어긋나지 않게). 재시도·대기열은 두지 않는다. 따라서 **DB 장애 중의 턴은 저장되지 않는다**. QAService가 예외를 삼키므로 `/query`는 정상 응답하고, 그 요청은 `DATABASE_TIMEOUT_S`만큼 늦어진다.
+  - [x] **드라이버·스키마 관리**: `psycopg` 3(동기) + `psycopg_pool`, `asyncio.to_thread`로 부른다(Redis와 같은 방식). 마이그레이션 도구 없이 첫 사용 때 `CREATE TABLE IF NOT EXISTS`(advisory lock). **스키마가 바뀌는 시점에 Alembic을 도입한다.**
+  - [x] **저장 형태**: `SessionTurn` JSON 전체를 `jsonb`로 두고 `seq`·`asked_at`·`request_id`만 컬럼으로 뽑는다(계약 타입이 바뀌어도 컬럼을 고치지 않는다). `seq`는 세션 행 upsert로 얻은 턴 수(동시 기록에도 겹치지 않음).
+- **계약 변경 범위**: #23에서 반영했다(`common/api.py` 주석, `interfaces.py` 독스트링, `CONTRACTS.md`, 예시 JSON, 버전·CHANGELOG·manifest). 목업은 이미 `expires_at=None`이고, 이 단위에서 `MockQAService`도 질문을 마스킹하게 맞췄다.
+- **완료 기준**
+  - [x] 계약 변경 PR이 먼저 `dev`에 반영됐다(#23).
+  - [x] 메시지가 DB에 기록되고, Redis 만료·상한과 무관하게 조회된다(실제 PostgreSQL·Redis로 확인: Redis 키를 지운 뒤 새 질문을 해도 이력 4턴이 온전).
+  - [x] DB가 꺼져 있어도 `/query`가 정상 응답한다(실제 DB를 멈추고 확인: `answered`, 약 2.3초. 풀 timeout만큼 느려진다).
+  - [x] 재시작 뒤에도 이력이 남는다(named volume `postgres_data`). 확인한 것은 컨테이너 재시작·정지/기동이고, 컨테이너를 지우는 `down` 뒤 재기동은 확인하지 못했다.
+- **테스트**: `tests/test_session_persistent.py`(메모리 가짜 DB + `fakeredis`: 쓰기 순서·무효화·채우기·보관 상한·Redis 만료 회귀·캐시/DB 장애 격리·`expires_at` 항상 None), `tests/test_session_db.py`(**실제 PostgreSQL**: 순서·limit·동시 기록 순번·읽을 수 없는 턴·새 풀로 재조회·동시 스키마 생성·접속 불가 시 빠른 실패. `TEST_DATABASE_URL`이 없으면 건너뛴다. CI에는 DB 서비스가 없어 CI에서는 돌지 않는다), `test_session.py`(질문 마스킹). 로컬 실행 방법은 README.
+- **알려진 한계**: DB가 오래 꺼져 있으면 요청마다 timeout만큼 늦어진다(차단기 없음). 조회가 DB를 읽는 사이 같은 세션에 기록이 들어오면 캐시가 한 턴 뒤처질 수 있다(다음 기록의 무효화나 TTL까지). 진입점 전환(`create_session_store`를 `create_qa_service`·`create_session_service`에 연결)은 I 단계다.
+
+### G3. 멀티턴 (세션 이력을 프롬프트에 삽입)
+
+- **목적**: 같은 `session_id`의 이전 질의응답을 답변에 반영한다(계약 v0.1.1: `QAService`는 `session_id`가 있으면 이전 turn을 반영한다). 지금은 질문·문맥만 모델에 가고 이력은 쓰지 않는다.
+- **방식(결정)**: 이력을 프롬프트에 직접 넣는다. 질문 재작성(후속 질문을 독립 질문으로 바꿔 검색)은 하지 않는다. **알려진 한계**: 후속 질문("그럼 초과하면 하루에 얼마야?")의 **검색은 여전히 원문 질문으로** 이뤄져 검색 품질이 떨어질 수 있다. 재작성은 나중에 검색 앞에 얹을 수 있게 구조를 열어 둔다.
+- **정할 것**: 넣을 턴 수와 이력 토큰 예산(문맥 예산과 나눠 쓴다: `전체 입력 예산 − 시스템 − 이력 − 질문`), 이력 속 이전 답변·질문의 지시문 방어, 캐시 키(H, 이력을 키에 넣거나 우회), 프롬프트 버전 `v3`.
+- **전제**: G2(DB 원본)가 머지되어 이력을 읽을 곳이 있다.
 
 ### H. Redis 캐시 (선택)
 

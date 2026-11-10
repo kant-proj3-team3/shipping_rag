@@ -2,7 +2,7 @@
 
 세 가지 검색 방식(Naive / 하이브리드 / 하이브리드+리랭킹)을 구현하고, 검색 품질(Hit@k, Recall@k)을 평가한다. 청킹과 답변 생성은 하지 않는다.
 
-> 현재 상태: **구현 중**. 세 검색 방식(Naive `dense.py`, 하이브리드 BM25 + RRF `hybrid.py`, 하이브리드+리랭킹 `reranker.py`)을 구현했다. 단위 테스트는 메모리 Qdrant, 가짜 청크, **가짜 리랭커**로 했다. 실제 리랭커 모델은 따로 한 번 불러서 확인했지만 점수 순서는 직접 쓴 예시 3쌍으로, 길이와 속도는 임시 청킹 결과(`chunks.json`)로 본 것이다. 정식 색인으로 한 검색과 검색 품질(Hit/Recall)은 아직 확인하지 못했다. 실제 평가기가 아직 없어서 `create_*`는 `src/retrieval/mock/`의 목업을 돌려준다.
+> 현재 상태: **구현 완료, 실제 색인으로 검증 전**. 세 검색 방식(Naive `dense.py`, 하이브리드 BM25 + RRF `hybrid.py`, 하이브리드+리랭킹 `reranker.py`)과 근거 그룹 평가기(`evaluator.py`)를 구현했다. 단위 테스트는 메모리 Qdrant, 가짜 청크, **가짜 리랭커**, 가짜 검색기로 했다. 실제 리랭커 모델은 따로 한 번 불러서 확인했지만 점수 순서는 직접 쓴 예시 3쌍으로, 길이와 속도는 임시 청킹 결과(`chunks.json`)로 본 것이다. 정식 색인으로 한 검색과 검색 품질(Hit/Recall)은 아직 확인하지 못했다. 기본값은 목업이고, 환경변수 `RETRIEVAL_IMPL=real`일 때만 실제 구현을 돌려준다.
 
 ## 공개 인터페이스
 
@@ -11,7 +11,7 @@
 | `create_retriever(embedder, index)` | `Retriever` | `retrieve(RetrievalRequest, RequestContext) -> RetrievalResult` (async). 방식은 `mode`로만 바꾼다 |
 | `create_retrieval_evaluator(retriever)` | `RetrievalEvaluator` | `evaluate(items, mode, k, unit, golden_fingerprint=None) -> RetrievalReport` (async) |
 
-주입받는 것: `Embedder`, `IndexManifest`(청킹 모듈 산출물). 설정은 환경변수(`QDRANT_URL`, 단독 개발은 `QDRANT_PATH`, 리랭킹은 `RERANKER_MODEL`·`RERANKER_MAX_TOKENS`)로 읽는다. 리랭킹 변수가 없으면 기본값(`BAAI/bge-reranker-v2-m3`, 512)을 쓴다.
+주입받는 것: `Embedder`, `IndexManifest`(청킹 모듈 산출물). 설정은 환경변수(`RETRIEVAL_IMPL`, `QDRANT_URL`, 단독 개발은 `QDRANT_PATH`, 리랭킹은 `RERANKER_MODEL`·`RERANKER_MAX_TOKENS`)로 읽는다. `RETRIEVAL_IMPL`이 없으면 `mock`이고 `real`이면 실제 구현이다. 리랭킹 변수가 없으면 기본값(`BAAI/bge-reranker-v2-m3`, 512)을 쓴다.
 
 ## 지킬 계약 (요약)
 
@@ -47,7 +47,8 @@
   - 계약상 세 방식은 `mode`로만 바뀌고 같은 임베딩·저장소·k를 쓴다. 검색기를 따로 만들면 이 조건을 지키기 어렵다.
   - 목업과 같은 오류 규칙을 지켜야 백엔드가 `InvalidInputError`를 400으로 매핑할 수 있다.
 - **전제(청킹 모듈)**: 컬렉션 이름은 `manifest.index_name`, 벡터는 이름 없는 기본 벡터, 거리 지표는 코사인이다. 다르면 청킹 담당과 맞춘다.
-- **감수할 점**: 실제 평가기와 실제 색인 데이터가 준비되기 전까지 `create_retriever`는 목업을 돌려준다. 실제 검색기를 먼저 연결하면 색인이 없는 환경에서 `cli eval`과 api 시연이 깨지기 때문이다. 연결할 때 `store.create_qdrant_client()`를 부른다.
+- **연결(`__init__.py`)**: `RETRIEVAL_IMPL=real`이면 `create_retriever`가 `store.create_qdrant_client()`로 만든 클라이언트와 `HybridRetriever`를, `create_retrieval_evaluator`가 `GroupRetrievalEvaluator`를 돌려준다. 그 밖에는 목업이다. 실제 구현은 필요할 때만 불러서, 목업만 쓸 때는 qdrant·torch를 읽지 않는다.
+- **감수할 점**: 기본값이 목업인 이유는 실제 색인이 없는 환경에서 `cli eval`과 api 시연이 깨지지 않게 하기 위해서다. `real`은 컬렉션이 없으면 `IndexNotReadyError`이고, 실제 색인으로는 아직 확인하지 못했다.
 
 ### 1. BM25는 `rank_bm25`로 검색 모듈 안에서 처리한다
 
@@ -95,11 +96,29 @@
 
 ### 4. 점수 임계값은 방식별 내부 설정으로 두고 기본은 끈다
 
-- **결정**: 방식(Naive / 하이브리드 / 리랭킹)마다 따로 환경변수로 받는 내부 설정이다. 기본값은 "임계값 없음"이다.
+- **결정**: 방식(Naive / 하이브리드 / 리랭킹)마다 따로 환경변수로 받는 내부 설정이다. 기본값은 "임계값 없음"이다. 아직 구현하지 않았다(기본값이 '없음'이라 현재 동작은 같다). 필요해지면 평가 결과를 보고 추가한다.
 - **이유**
   - 코사인·BM25·RRF·리랭커 점수는 척도가 달라 공통 임계값을 둘 수 없다. 공통 계약에 넣으면 방식 간 점수를 비교하는 것처럼 오해하게 된다(CLAUDE.md: 점수는 방식 간에 직접 비교하지 않는다).
   - 기본을 끄면 세 방식이 같은 `k`로 비교되고, 빈 결과는 실패가 아니라는 계약과도 충돌하지 않는다.
   - 임계값은 평가 결과를 본 뒤 필요하면 켠다.
+
+### 5. 평가기는 근거 그룹 단위로 계산하고, 실패와 해당 없음은 평균에서 뺀다
+
+- **결정**(`evaluator.py`의 `GroupRetrievalEvaluator`)
+  - 문항마다 `item.question`만 검색에 넘기고, 근거 그룹은 채점에만 쓴다. 그룹 안 후보 중 하나라도 어느 청크와 일치하면 그 그룹은 만족이다(그룹끼리 AND, 그룹 안 OR). Hit = 만족한 그룹이 하나라도 있으면 1, Recall = 만족한 그룹 수 / 전체 그룹 수다. 만족 여부는 그룹 번호로 기록하므로 같은 근거가 여러 청크에서 나와도 한 번만 센다.
+  - `unit`은 호출자가 명시한다. `document`는 `book_id`가 같으면, `page`는 청크의 `[page_start, page_end]`가 근거 페이지를 포함하면 일치다.
+  - 근거 그룹이 없는 문항은 검색하지 않고 `not_applicable`, 검색 호출이 실패한 문항은 `unavailable`이며 둘 다 평균에서 빼고 건수를 보고한다. 검색 결과가 비어도 근거가 있는 문항은 0점으로 센다. 평가할 문항이 하나도 없으면 평균은 0이 아니라 `None`이다.
+  - 보고서에 `unit`, `index_name`, `index_fingerprint`(`retriever.index`에서), `golden_fingerprint`(호출자가 넘긴 값)를 남긴다.
+  - `k`가 1 미만이거나 50(`RetrievalRequest.k`의 상한)을 넘으면 평가를 시작하기 전에 `ValueError`로 막는다. 문항을 동시에 8개까지만 검색한다.
+- **이유**
+  - 잘못된 `k`를 그대로 두면 모든 문항의 검색이 실패해 모두 `unavailable`이 되고 원인이 가려진다.
+  - 임베더와 리랭커가 한꺼번에 몰리지 않도록 동시 검색 수를 제한한다.
+  - 미확인 값을 0으로 채우지 않는다는 규칙(`None`, `not_applicable`, `unavailable`)을 지킨다.
+- **감수할 점**
+  - 목업 평가기(`mock/evaluator.py`)와 계산 규칙이 거의 같아 중복이 있다. CLAUDE.md의 "목업을 유지한다"는 규칙에 따라 그대로 두었다.
+  - 검색 호출의 모든 예외를 `unavailable`로 처리하므로 코드 오타 같은 예상 밖의 오류도 문항 실패로 가려질 수 있다. 보고서의 `unavailable` 건수와 사유(`reason`)를 함께 확인한다.
+  - 실제 색인과 골든 데이터로는 아직 평가하지 않았다.
+  - `hybrid_rerank`는 문항마다 리랭킹 시간이 더해진다. CPU에서 후보 50개에 보통 3.8초 안팎이고 모델 호출이 직렬이라, 60문항을 돌리면 4분에서 15분 정도 걸릴 수 있다(위 3번의 측정값에서 계산한 추정이다).
 
 ## 테스트
 

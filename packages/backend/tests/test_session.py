@@ -21,7 +21,7 @@ from backend.session import (
     KEY_PREFIX,
     RedisSessionService,
     RedisSessionStore,
-    create_session_store,
+    create_redis_session_store,
     session_max_turns,
     session_ttl_seconds,
 )
@@ -276,6 +276,23 @@ def test_qa_records_non_error_turns_and_skips_errors():
     assert info.turns[0].citations and info.turns[0].citations[0].file_name == "IS01.pdf"
 
 
+def test_qa_stores_question_with_emails_and_keys_masked():
+    # 영구 저장하므로 이메일·키 모양 문자열은 가려서 기록한다(계약 v0.1.1). 응답은 그대로다.
+    store = _store()
+    request = QueryRequest(
+        question="담당자 kim@example.com 에게 체선료를 문의하면? 키는 sk-abcdefghijklmnopqrstuv 입니다.",
+        session_id=SID,
+    )
+    result = asyncio.run(
+        _service(FakeRetriever([_chunk()]), store).answer(request, RequestContext(request_id="req-1"))
+    )
+    assert result.response.status is AnswerStatus.ANSWERED
+    stored = store.get(SID, 20).turns[0].question
+    assert "kim@example.com" not in stored and "[EMAIL]" in stored
+    assert "sk-abcdefghijklmnopqrstuv" not in stored and "[SECRET]" in stored
+    assert "체선료를 문의하면" in stored  # 나머지 문장은 그대로
+
+
 def test_qa_without_session_id_records_nothing():
     client = _client()
     _ask(_service(FakeRetriever([_chunk()]), _store(client)))
@@ -320,7 +337,7 @@ def test_slow_store_does_not_block_the_event_loop():
 def test_create_session_store_does_not_connect(monkeypatch):
     monkeypatch.setenv(ENV_REDIS_URL, "redis://127.0.0.1:1/0")  # 아무도 듣지 않는 포트
     monkeypatch.setenv(ENV_REDIS_TIMEOUT, "0.5")
-    store = create_session_store()  # 생성만으로는 실패하지 않는다(앱 기동이 Redis 를 기다리지 않는다)
+    store = create_redis_session_store()  # 생성만으로는 실패하지 않는다(앱 기동이 Redis 를 기다리지 않는다)
     kwargs = store._client.connection_pool.connection_kwargs
     assert kwargs["socket_timeout"] == 0.5 and kwargs["socket_connect_timeout"] == 0.5
     assert kwargs["decode_responses"] is True
@@ -330,7 +347,7 @@ def test_create_session_store_does_not_connect(monkeypatch):
 
 def test_create_session_store_accepts_injected_client():
     client = _client()
-    store = create_session_store(client=client)
+    store = create_redis_session_store(client=client)
     store.append(SID, _turn(1))
     assert store.get(SID, 20).turn_count == 1
 
@@ -346,5 +363,5 @@ def test_invalid_env_falls_back_to_defaults(monkeypatch, raw):
 def test_env_overrides(monkeypatch):
     monkeypatch.setenv(ENV_SESSION_TTL, "120")
     monkeypatch.setenv(ENV_SESSION_MAX_TURNS, "7")
-    store = create_session_store(client=_client())
+    store = create_redis_session_store(client=_client())
     assert store._ttl_s == 120 and store._max_turns == 7
