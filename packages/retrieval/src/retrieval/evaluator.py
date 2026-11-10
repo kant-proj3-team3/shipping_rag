@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 
+from common.errors import IndexNotReadyError, RetrievalError
 from common.interfaces import Retriever
 from common.types import (
     Chunk,
@@ -52,8 +53,12 @@ class GroupRetrievalEvaluator:
     """각 근거 그룹의 충족 여부를 판단하고 문항별·전체 검색 점수를 계산한다."""
 
     def __init__(self, retriever: Retriever,
-max_concurrency: int = MAX_CONCURRENCY) -> None:
-        """평가에 사용할 검색기와 동시 검색 수의 상환을 저장한다."""
+                 max_concurrency: int = MAX_CONCURRENCY) -> None:
+        """평가에 사용할 검색기와 동시 검색 수의 상한을 저장한다."""
+
+        # Semaphore(0)이면 어떤 문항도 검색에 들어가지 못해 evaluate가 오류 없이 멈추므로 생성 시점에 막는다.
+        if max_concurrency < 1:
+            raise ValueError(f"max_concurrency는 1 이상이어야 한다: {max_concurrency}")
 
         self._retriever = retriever
         self._max_concurrency = max_concurrency
@@ -96,6 +101,9 @@ max_concurrency: int = MAX_CONCURRENCY) -> None:
                             k=k),
                             RequestContext(request_id=f"eval-{item.id}"),
                             )
+            except IndexNotReadyError:
+                # 인덱스·설정 문제는 모든 문항에 똑같이 생기므로 문항별로 삼키지 않고 평가를 멈춘다
+                raise
             except Exception as exc:
 
                 # 검색 실패 문항은 평가 불가로 기록하고 전체 평균에서 제외
@@ -118,7 +126,7 @@ max_concurrency: int = MAX_CONCURRENCY) -> None:
             ]
 
 
-            # Hit : 한 그룹이라도 찾으면 1점 / Recall: 찾은 그룹 수 + 전체 그룹 수
+            # Hit : 한 그룹이라도 찾으면 1점 / Recall: 찾은 그룹 수 / 전체 그룹 수
             # 검색이 성공했지만 결과가 비어 있으면 두 지표 모두 0점
             return RetrievalItemMetrics(
                 item_id=item.id,
@@ -132,7 +140,15 @@ max_concurrency: int = MAX_CONCURRENCY) -> None:
         metrics = list(await asyncio.gather(*(evaluate_item(i) for i in items)))
         # gather의 반환값은 완료 순서가 아니라 입력 문항 순서를 유지
         scored = [m for m in metrics if m.hit.state is ScoreState.SCORED]
+        failed = [m for m in metrics if m.hit.state is ScoreState.UNAVAILABLE]
 
+        # 검색한 문항이 하나도 성공하지 못했으면 평가가 성립하지 않으므로 오류로 알린다
+        # (Qdrant 연결 실패처럼 모든 문항이 같은 이유로 실패하는 경우를 평균 None 으로 숨기지 않기 위함)
+        # 근거 없는 문항만 있는 경우(failed 가 비어 있음)는 오류가 아니다
+        if failed and not scored:
+            raise RetrievalError(
+                f"모든 문항({len(failed)}건)의 검색이 실패했다. 첫 사유: {failed[0].hit.reason}"
+            )
 
         # 검색 조건, 데이터 식별 정보, 문항별 결과와 상태별 건수를 보고서로 구성
         return RetrievalReport(

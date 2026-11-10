@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 import retrieval
-from common.errors import RetrievalError
+from common.errors import IndexNotReadyError, RetrievalError
 from common.types import (
     Chunk,
     EvidenceRef,
@@ -35,18 +35,20 @@ def chunk(book="B1", start=1, end=None, cid=None) -> Chunk:
 
 
 class FakeRetriever:
-    """질문별로 정해 둔 청크를 돌려주는 가짜 검색기. fail 에 든 질문은 RetrievalError 를 낸다."""
+    """질문별로 정해 둔 청크를 돌려주는 가짜 검색기. fail 에 든 질문은 error(기본 RetrievalError)를 낸다."""
 
-    def __init__(self, by_question: dict[str, list[Chunk]], fail: set[str] = frozenset()):
+    def __init__(self, by_question: dict[str, list[Chunk]], fail: set[str] = frozenset(),
+                 error: type[Exception] = RetrievalError):
         self.index = MANIFEST
         self._by_question = by_question
         self._fail = fail
+        self._error = error
         self.requests = []
 
     async def retrieve(self, request, ctx):
         self.requests.append(request)
         if request.query in self._fail:
-            raise RetrievalError("boom")
+            raise self._error("boom")
         chunks = self._by_question.get(request.query, [])[: request.k]
         return RetrievalResult(
             mode=request.mode, k=request.k,
@@ -123,6 +125,24 @@ def test_호출_실패는_unavailable이고_평균에서_뺀다():
     assert report.hit_at_k_mean == 1.0  # 실패 문항을 0점으로 섞지 않는다
 
 
+def test_IndexNotReadyError는_문항별로_삼키지_않고_전파한다():
+    r = FakeRetriever({"q1": [chunk("B1", 1)]}, fail={"q2"}, error=IndexNotReadyError)
+    with pytest.raises(IndexNotReadyError):
+        run(r, [item("i1", "q1", [[("B1", 1)]]), item("i2", "q2", [[("B1", 1)]])])
+
+
+def test_모든_문항의_검색이_실패하면_RetrievalError로_알린다():
+    r = FakeRetriever({}, fail={"q1", "q2"})
+    with pytest.raises(RetrievalError, match="boom"):  # 첫 사유가 메시지에 남는다
+        run(r, [item("i1", "q1", [[("B1", 1)]]), item("i2", "q2", [[("B1", 1)]])])
+
+
+def test_근거_없는_문항만_있으면_오류_없이_평균은_None():
+    report = run(FakeRetriever({}), [item("i1", "q1", [])])
+    assert (report.scored, report.not_applicable, report.unavailable) == (0, 1, 0)
+    assert report.hit_at_k_mean is None
+
+
 def test_평가할_문항이_없으면_평균은_None():
     report = run(FakeRetriever({}), [item("i1", "q", [])])
     assert report.hit_at_k_mean is None and report.recall_at_k_mean is None
@@ -146,6 +166,12 @@ def test_입력_순서가_유지되고_질문만_검색에_전달된다():
 def test_k가_범위를_벗어나면_ValueError(k):
     with pytest.raises(ValueError):
         run(FakeRetriever({}), [item("i1", "q", [[("B1", 1)]])], k=k)
+
+
+@pytest.mark.parametrize("n", [0, -1])
+def test_max_concurrency가_1보다_작으면_ValueError(n):
+    with pytest.raises(ValueError):
+        GroupRetrievalEvaluator(FakeRetriever({}), max_concurrency=n)
 
 
 def test_RETRIEVAL_IMPL이_없으면_목업을_돌려준다(monkeypatch):
