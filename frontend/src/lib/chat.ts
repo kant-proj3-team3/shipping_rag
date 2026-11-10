@@ -150,9 +150,7 @@ export function hasServerTurn(messages: Message[]): boolean {
 
 /**
  * 받지 못하고 중지로 남은 마지막 답변을 서버 기록으로 채울 내용. 새로고침 · 탭 닫기로 끊겨도 서버는 답을 끝내 기록할 수 있다.
- * 서버 기록이 브라우저에 있는 답보다 많고, 서버의 마지막 기록이 마지막 질문의 것일 때만 채운다.
- * 마지막 질문의 기록인지는 질문 글자로 맞춰 본다. 서버는 이메일 · 키 모양 문자열을 가려 기록해 글자가 다를 수 있으므로,
- * 앞의 질문이 모두 기록 여부가 정해져 있고 서버 기록이 꼭 하나 더 많으면 글자가 달라도 마지막 질문의 기록으로 본다
+ * 서버의 마지막 기록이 그 질문의 것일 때만 채운다
  *
  * @returns 채울 답변. 채울 것이 없으면 undefined
  */
@@ -167,13 +165,16 @@ export function stoppedAnswerFromSession(
   }
   const earlier = conversation.messages.slice(0, -1);
   const recordedCount = earlier.filter(isServerAnswer).length;
+  // 서버 기록이 브라우저의 답보다 많지 않으면 마지막 질문은 아직 기록되지 않았다
+  if (recordedCount >= info.turnCount) {
+    return undefined;
+  }
+  // 서버는 질문의 이메일 · 키 모양 문자열을 가려 기록해 글자가 다를 수 있다.
+  // 앞의 답이 모두 기록 여부가 정해져 있고 서버 기록이 꼭 하나 더 많으면, 그 하나는 마지막 질문의 것이다
   const isLastQuestionTurn =
     turn.question === last.question ||
     (info.turnCount === recordedCount + 1 && !earlier.some(isUncertainAnswer));
-  if (recordedCount >= info.turnCount || !isLastQuestionTurn) {
-    return undefined;
-  }
-  return { answerId: last.id, answer: answerFromTurn(turn) };
+  return isLastQuestionTurn ? { answerId: last.id, answer: answerFromTurn(turn) } : undefined;
 }
 
 /** 질문 하나를 보낼 때 쓰는 id 와 시각. 부르는 쪽이 만들어 넘겨 함수는 순수하게 둔다 */
