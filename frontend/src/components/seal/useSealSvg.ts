@@ -1,5 +1,11 @@
 import { useId } from "react";
 
+/** 물개 그림의 머리 반지름 (viewBox 0 0 128 128 기준). 몸 실루엣과 얼굴이 같은 원을 쓴다 */
+export const SEAL_HEAD_RADIUS = 32;
+
+/** 물개 그림의 선 색 */
+export const SEAL_INK = "#2a1c1c";
+
 /** 물개 그림 공통 속성 */
 export interface SealProps {
   /** 움직임. 끄면 멈춘 그림이다 (움직임 줄이기 설정에서는 켜도 멈춘다) */
