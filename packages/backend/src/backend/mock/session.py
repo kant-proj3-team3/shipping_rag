@@ -1,4 +1,4 @@
-"""목업 세션: 프로세스 메모리에 저장한다 (실제 구현은 Redis, 모든 키에 TTL)."""
+"""목업 세션: 프로세스 메모리에 저장한다 (실제 구현은 PostgreSQL 원본 + Redis 캐시). 만료가 없어 `expires_at` 은 항상 None 이다."""
 
 from __future__ import annotations
 
