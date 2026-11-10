@@ -2,7 +2,7 @@ import { AnswerCard } from "./AnswerCard";
 import { ErrorMessage } from "./ErrorMessage";
 import type { AnswerMessage } from "../../lib/chat";
 import { REQUEST_ERROR_TEXT } from "../../lib/labels";
-import { SealMascot } from "../SealMascot";
+import { SealMascot } from "../seal/SealMascot";
 
 interface AssistantMessageProps {
   message: AnswerMessage;

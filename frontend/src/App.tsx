@@ -5,7 +5,7 @@ import { ChatView } from "./components/ChatView";
 import { Composer } from "./components/Composer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RetrievalModeSelect } from "./components/RetrievalModeSelect";
-import { SealMascot } from "./components/SealMascot";
+import { SealMascot } from "./components/seal/SealMascot";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarDrawer } from "./components/SidebarDrawer";
 import { ThemeSelect } from "./components/ThemeSelect";
