@@ -7,10 +7,10 @@ import type { SessionInfo } from "../api/types";
  * 보고 있는 대화의 세션 상태.
  * - checking: GET /session 으로 확인하는 중 (보내지 않는다)
  * - live: 같은 세션으로 이어서 묻는다 (확인하지 못했어도 브라우저에 내용이 있으면)
- * - expired: 서버에서 만료됐다. 다음 질문은 새 대화로 시작한다
+ * - gone: 서버가 답한 적 있는데 서버에 기록이 없다 (서버 저장소를 비운 경우 등). 다음 질문은 새 대화로 시작한다
  * - missing: 브라우저에도 없고 서버 기록으로도 채울 수 없다. 새 대화 화면으로 연다
  */
-export type SessionStatus = "checking" | "live" | "expired" | "missing";
+export type SessionStatus = "checking" | "live" | "gone" | "missing";
 
 /** 세션 확인 요청의 진행 상태 */
 export type SessionLookup =
@@ -19,7 +19,7 @@ export type SessionLookup =
   | { state: "pending" }
   /** 응답을 받지 못했다 */
   | { state: "failed" }
-  /** 응답을 받았다. 없거나 만료된 세션이면 null */
+  /** 응답을 받았다. 서버에 기록이 없는 세션이면 null */
   | { state: "done"; info: SessionInfo | null };
 
 /** 보고 있는 대화의 화면 상태 */
@@ -36,7 +36,7 @@ function localStatusOf(lookup: SessionLookup, local: Conversation): SessionStatu
     return "checking";
   }
   const isGone = lookup.state === "done" && lookup.info === null;
-  return isGone && hasServerTurn(local.messages) ? "expired" : "live";
+  return isGone && hasServerTurn(local.messages) ? "gone" : "live";
 }
 
 /**

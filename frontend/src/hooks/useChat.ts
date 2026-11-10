@@ -46,8 +46,8 @@ export interface UseChatResult {
   isBusy: boolean;
   /** 보고 있는 대화의 서버 세션을 확인하는 중. 끝날 때까지 보내지 않는다 */
   isChecking: boolean;
-  /** 보고 있는 대화가 서버에서 만료됐다. 다음 질문은 새 대화로 시작한다 */
-  isExpired: boolean;
+  /** 보고 있는 대화의 서버 기록이 없다. 다음 질문은 새 대화로 시작한다 */
+  isSessionGone: boolean;
   /** 마지막 저장 결과 */
   saveResult: SaveResult;
   /** 방금 지워서 실행 취소할 수 있는 대화 */
@@ -71,7 +71,7 @@ export interface UseChatResult {
  * - 대화 하나 = 서버 세션 하나. 대화 id 가 곧 session_id 다
  * - 목록은 브라우저 저장소에 남긴다 (서버 기록에는 근거 · 오류 안내가 없다)
  * - 대화를 열거나 새로고침하면 서버 세션을 확인한다 (useSessionLookup · lib/session.ts).
- *   브라우저에 내용이 없으면 서버 기록으로 채우고, 만료됐으면 알린 뒤 다음 질문을 새 대화로 보낸다.
+ *   브라우저에 내용이 없으면 서버 기록으로 채우고, 서버 기록이 없어졌으면 알린 뒤 다음 질문을 새 대화로 보낸다.
  *   받지 못하고 중지로 남은 마지막 답변은 서버가 기록해 두었으면 그 기록으로 채운다
  */
 export function useChat(): UseChatResult {
@@ -185,8 +185,8 @@ export function useChat(): UseChatResult {
     if (text === "" || controllerRef.current !== null || status === "checking") {
       return false;
     }
-    // 새 대화 화면이거나 만료된 대화면 새 세션으로 시작한다
-    const id = currentId !== undefined && status !== "expired" ? currentId : newId();
+    // 새 대화 화면이거나 서버 기록이 없어진 대화면 새 세션으로 시작한다
+    const id = currentId !== undefined && status !== "gone" ? currentId : newId();
     const existing =
       historyRef.current.conversations.find((c) => c.id === id) ??
       (restored?.id === id ? restored : undefined);
@@ -258,7 +258,7 @@ export function useChat(): UseChatResult {
     activeId,
     isBusy: activeId !== undefined,
     isChecking: status === "checking",
-    isExpired: status === "expired",
+    isSessionGone: status === "gone",
     saveResult,
     lastDeleted,
     send,

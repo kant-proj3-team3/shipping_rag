@@ -49,7 +49,7 @@ export interface ApiClient {
   /**
    * 세션의 대화 이력 (최근 SESSION_MAX_LIMIT 개까지).
    *
-   * @returns 없거나 만료된 세션이면 null
+   * @returns 서버에 기록이 없는 세션이면 null
    * @throws RequestError 응답을 받지 못했거나 요청이 422 로 거절됐을 때
    */
   getSession: (sessionId: string, signal?: AbortSignal) => Promise<SessionInfo | null>;

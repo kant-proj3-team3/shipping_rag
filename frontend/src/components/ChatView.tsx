@@ -16,8 +16,8 @@ interface ChatViewProps {
   messages: Message[];
   /** 대화의 서버 세션을 확인하는 중. 보여 줄 메시지가 없으면 불러오는 중으로 그린다 */
   isChecking: boolean;
-  /** 서버에서 만료된 대화. 메시지 아래에 안내를 붙인다 */
-  isExpired: boolean;
+  /** 서버 기록이 없어진 대화. 메시지 아래에 안내를 붙인다 */
+  isSessionGone: boolean;
   /** 되묻기에서 "조건 보완해서 묻기"를 눌렀을 때. 원래 질문을 넘긴다 */
   onClarify: (question: string) => void;
   /** 빈 대화의 예시 질문을 눌렀을 때 */
@@ -61,7 +61,7 @@ function EmptyState({ onPickExample }: EmptyStateProps) {
 function ChatViewInner({
   messages,
   isChecking,
-  isExpired,
+  isSessionGone,
   onClarify,
   onPickExample,
 }: ChatViewProps) {
@@ -104,9 +104,10 @@ function ChatViewInner({
             )}
           </div>
         ))}
-        {isExpired ? (
+        {isSessionGone ? (
           <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            서버에서 만료된 대화입니다. 내용은 그대로 볼 수 있고, 다음 질문은 새 대화로 시작합니다.
+            서버에서 이 대화 기록을 찾을 수 없습니다. 내용은 그대로 볼 수 있고, 다음 질문은 새
+            대화로 시작합니다.
           </p>
         ) : null}
         <div ref={endRef} />

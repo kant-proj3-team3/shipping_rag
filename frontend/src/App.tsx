@@ -156,7 +156,7 @@ export function App() {
           <ChatView
             messages={chat.messages}
             isChecking={chat.isChecking}
-            isExpired={chat.isExpired}
+            isSessionGone={chat.isSessionGone}
             onClarify={handleFillDraft}
             onPickExample={handleFillDraft}
           />
