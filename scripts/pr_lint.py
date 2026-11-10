@@ -5,7 +5,7 @@
 
 검사
   1. 제목: `type(scope): 설명` 또는 `type: 설명` (Conventional Commits). scope 는 선택.
-  2. 브랜치: feat/* → dev, dev → main 만 허용한다.
+  2. 브랜치: feat/*·fix/* → dev, dev → main 만 허용한다.
   3. 본문: .github/pull_request_template.md 의 필수 항목을 채웠는가
      (변경 요약, 대상 모듈 1개 이상 체크, 계약 영향, 실행한 검사).
 """
@@ -32,12 +32,16 @@ def check_title(title: str) -> list[str]:
     ]
 
 
+# dev 로 PR 을 올릴 수 있는 작업 브랜치의 접두어. 제목 type(feat·fix)과 짝을 맞춘다.
+WORK_BRANCH_PREFIXES = ("feat/", "fix/")
+
+
 def check_branches(head: str, base: str) -> list[str]:
-    if base == "dev" and head.startswith("feat/") and len(head) > len("feat/"):
+    if base == "dev" and any(head.startswith(p) and len(head) > len(p) for p in WORK_BRANCH_PREFIXES):
         return []
     if base == "main" and head == "dev":
         return []
-    return [f"허용되지 않는 브랜치 조합이다: {head} → {base} (허용: feat/* → dev, dev → main)"]
+    return [f"허용되지 않는 브랜치 조합이다: {head} → {base} (허용: feat/*·fix/* → dev, dev → main)"]
 
 
 def sections(body: str) -> dict[str, str]:
