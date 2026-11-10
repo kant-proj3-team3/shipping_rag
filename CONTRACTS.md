@@ -75,13 +75,14 @@ React ──HTTP──▶ backend router (OpenAPI가 계약)
   - 같은 `request_id`로 질문·검색 문서·실제 모델 입출력·시간·토큰을 Langfuse에 묶어 기록한다.
   - 기록에 성공하면 `meta.trace_id`를 반드시 채운다 (Langfuse 점수는 `trace_id`에 붙는다). 비용 `meta.cost_usd`는 계산할 수 있을 때만 채우고 모르면 `None`이다.
   - `QAResult.final_context`는 모델에 실제 전달한 문맥과 같아야 한다 (평가 입력).
-- **세션 (`/session`)**: `GET /session/{session_id}?limit=20` → `SessionInfo`. 없거나 만료된 세션은 404 + `ApiError(session_not_found)`.
+- **세션 (`/session`)**: `GET /session/{session_id}?limit=20` → `SessionInfo`. 한 번도 기록되지 않은 세션은 404 + `ApiError(session_not_found)`. 세션은 만료되지 않으므로 `SessionInfo.expires_at`은 항상 `null`이다.
   - 세션 ID는 **클라이언트가 UUID로 만들어** `QueryRequest.session_id`로 보낸다 (영문·숫자·`_`·`-` 8~128자). 보내지 않으면 세션 기록 없이 단발 처리한다.
   - `QAService`가 `answered`·`needs_clarification`·`abstained` 응답을 turn으로 기록한다. `error`는 기록하지 않는다.
+  - 이력은 영구 저장소(PostgreSQL)가 원본이고 Redis는 조회 캐시다. 기록하는 `question`은 이메일·API 키 모양 문자열을 가린 값이라 대화를 복원할 때 입력 원문과 다를 수 있다.
   - `turns`는 오래된 것 → 최신 순으로 최근 `limit`개, `turn_count`는 전체 개수다.
   - 인증이 없으므로 세션 ID를 아는 사람은 누구나 조회할 수 있다. 추측 불가능한 값을 쓴다.
-  - 세션 이력을 프롬프트에 쓰면 아래 캐시 키에 이력을 반영하거나 그 요청은 캐시를 우회한다 (같은 질문이라도 이력에 따라 답이 달라진다).
-- **Redis 캐시**: 계약에 드러나는 것은 `meta.cache_hit`뿐이다. 캐시 적중 조건에는 최소한 질문, `retrieval_mode`, `k`, `index_name`+`embedder_id`(`retriever.index`에서 읽는다), **`manifest.fingerprint`**, 프롬프트 버전이 포함돼야 한다. 같은 이름으로 재색인하면 `fingerprint`가 바뀌고, Redis는 api를 재시작해도 남으므로 `fingerprint`가 없으면 옛 인덱스 기준 답변이 적중한다. 모드가 다른데 적중하면 세 방식 비교가 무의미해진다. 세션 기록과 캐시 모두 Redis를 쓰지만 키 공간은 분리한다.
+  - **멀티턴**: `session_id`가 있으면 같은 세션의 이전 질의응답(turn)을 답변에 반영한다. 반영할 turn 수와 방식은 구현이 정한다. 이력을 쓴 요청은 아래 캐시 키에 이력을 반영하거나 캐시를 우회한다 (같은 질문이라도 이력에 따라 답이 달라진다).
+- **Redis 캐시**: 계약에 드러나는 것은 `meta.cache_hit`뿐이다. 캐시 적중 조건에는 최소한 질문, `retrieval_mode`, `k`, `index_name`+`embedder_id`(`retriever.index`에서 읽는다), **`manifest.fingerprint`**, 프롬프트 버전이 포함돼야 한다. 같은 이름으로 재색인하면 `fingerprint`가 바뀌고, Redis는 api를 재시작해도 남으므로 `fingerprint`가 없으면 옛 인덱스 기준 답변이 적중한다. 모드가 다른데 적중하면 세 방식 비교가 무의미해진다. 세션 이력의 조회 캐시와 응답 캐시 모두 Redis를 쓰지만 키 공간은 분리한다.
 - `AnswerEvaluator.evaluate(records) -> list[AnswerEvaluation]`: 입력과 같은 순서·길이. 사실 주장 없음 → `not_applicable`, 평가 실패 → `unavailable`. 채점 호출의 시간·토큰은 서비스 `meta`에 합산하지 않는다.
   - `faithfulness`는 필수, `answer_relevancy`·`context_recall`·`context_precision`은 `ragas_extra`에 키로 담는다. `answer_relevancy`는 질문 임베딩이 필요해 생성 시 `Embedder`를 주입받는다 (안 쓰면 `None`).
   - 정답·채점 기준(`GradingSpec`)은 평가 호출에만 전달한다. 보안 문항은 `security.bad_claims`가 응답에 나타나면 감점한다.
@@ -147,7 +148,7 @@ CODEOWNERS는 `.github/CODEOWNERS`가 원본이다. 한 줄에 여러 명을 적
 3. 평가 러너(질문 전체 × 세 방식 실행, 비교표 생성)는 `app/`의 스크립트로 둘 것인가. 이 계약에는 러너를 넣지 않았다. (현황: `app/cli.py eval`이 검색 평가만 하는 임시 러너로 있고, 답변 평가(`AnswerEvaluator`) 러너는 아직 없다.)
 4. 검색 평가 단위(`document` / `page`)를 무엇으로 보고할 것인가. 제공 데이터는 문서당 60~95페이지, 정답 근거는 전체 3,750페이지 중 126페이지(3.4%)라 문서 단위는 쉽게 포화된다 (간단한 BM25 기준선에서 Hit@5가 문서 0.98, 페이지 0.93, Recall@5가 0.76 대 0.62). 발제문의 정의를 확인하고 정한다.
 5. 프론트엔드가 `packages/` 밖(`frontend/`)에 놓이는 것을 진행 방식 문서의 레포 구조에 반영할 것인가.
-6. 세션 ID를 클라이언트가 만드는 방식(서버 발급 아님), `error` 응답을 turn으로 기록하지 않는 규칙, 세션 TTL 값에 동의하는가. (TTL은 `expires_at`으로만 노출한다)
+6. 세션 ID를 클라이언트가 만드는 방식(서버 발급 아님), `error` 응답을 turn으로 기록하지 않는 규칙, 세션 이력의 영구 저장(만료 없음, `expires_at`은 항상 `null`)과 질문의 이메일·키 마스킹 저장에 동의하는가. 같은 세션의 이전 turn을 답변에 반영하는 멀티턴에 동의하는가.
 7. 보류(`abstained`)·되묻기 응답에 출처를 붙일 수 있게 둔 것에 동의하는가. 교안(`validate_answer`)은 보류 응답의 출처를 빈 배열로 강제하지만, 제공 데이터의 `abstain` 문항은 근거 그룹을 가지므로(설명에 쓰인 문서) 계약은 허용한다.
 8. RAGAS 선택 지표(`answer_relevancy`·`context_recall`·`context_precision`)를 쓸 것인가. 쓰면 `AnswerEvaluator`에 `Embedder`가 주입된다.
 9. `QueryRequest.question` 최대 500자(제공 데이터의 가장 긴 질문은 170자)와 `invalid_input`→400 매핑에 동의하는가.

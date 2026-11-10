@@ -1,4 +1,4 @@
 {
   "error_code": "session_not_found",
-  "message": "세션이 없거나 만료되었습니다."
+  "message": "세션을 찾을 수 없습니다."
 }
