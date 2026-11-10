@@ -29,6 +29,9 @@ export const SAVE_WARNING_TEXT: Record<Exclude<SaveResult, "saved">, string> = {
   failed: "대화 목록을 저장하지 못했습니다 (브라우저 저장소를 쓸 수 없음)",
 };
 
+/** 서버가 오류로 답했는데 사용자용 문구가 비어 있을 때의 안내 (계약은 빈 문구도 허용한다) */
+export const UNKNOWN_ERROR_TEXT = "알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.";
+
 /**
  * 응답을 받지 못한 이유별 사용자용 안내. 코드 자체는 로그용이라 화면에 보이지 않는다.
  * aborted 는 오류가 아니라 중지로 그려 안내가 없다

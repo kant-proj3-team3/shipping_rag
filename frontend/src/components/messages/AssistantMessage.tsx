@@ -2,7 +2,7 @@ import { AnswerCard } from "./AnswerCard";
 import { ErrorMessage } from "./ErrorMessage";
 import { SealLoader } from "./SealLoader";
 import type { AnswerMessage } from "../../lib/chat";
-import { REQUEST_ERROR_TEXT } from "../../lib/labels";
+import { REQUEST_ERROR_TEXT, UNKNOWN_ERROR_TEXT } from "../../lib/labels";
 
 interface AssistantMessageProps {
   message: AnswerMessage;
@@ -19,9 +19,15 @@ function PendingMessage() {
   );
 }
 
+// 서버의 사용자용 오류 문구. 계약은 빈 문구도 허용해, 비어 있으면 알 수 없는 오류로 안내한다
+function serverErrorText(text: string): string {
+  return text.trim() === "" ? UNKNOWN_ERROR_TEXT : text;
+}
+
 /**
  * 답변 하나: 기다리는 중 → 상태별 답변 카드 또는 오류 안내.
- * 서버가 status=error 로 답하면 서버의 사용자용 문구를, 응답을 받지 못하면 이유별 안내를 보여 준다.
+ * 서버가 status=error 로 답하면 서버의 사용자용 문구를(비어 있으면 알 수 없는 오류 안내를),
+ * 응답을 받지 못하면 이유별 안내를 보여 준다.
  */
 export function AssistantMessage({ message, onClarify }: AssistantMessageProps) {
   switch (message.state) {
@@ -33,7 +39,7 @@ export function AssistantMessage({ message, onClarify }: AssistantMessageProps) 
       return <ErrorMessage text={REQUEST_ERROR_TEXT[message.failure]} />;
     case "done":
       return message.answer.status === "error" ? (
-        <ErrorMessage text={message.answer.answer} />
+        <ErrorMessage text={serverErrorText(message.answer.answer)} />
       ) : (
         <AnswerCard answer={message.answer} onClarify={() => onClarify(message.question)} />
       );
