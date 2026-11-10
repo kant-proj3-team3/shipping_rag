@@ -1,28 +1,15 @@
-import { useId } from "react";
-
-interface SealMascotProps {
-  /** 손 흔들기 · 눈 깜박임 같은 움직임. 끄면 멈춘 그림이다 (움직임 줄이기 설정에서는 켜도 멈춘다) */
-  isAnimated?: boolean;
-  /** 크기 · 배치 (예: "size-16") */
-  className?: string;
-}
+import { useSealSvg, type SealProps } from "./useSealSvg";
 
 /**
- * 마스코트 물개 그림: 머리띠를 두르고 양손을 든 모습.
+ * 마스코트 물개 그림: "오늘도 해내자!" 머리띠를 두르고 양손을 든 모습.
  *
  * 옆의 글이 설명을 맡으므로 스크린 리더에는 숨긴다.
  */
-export function SealMascot({ isAnimated = false, className = "" }: SealMascotProps) {
-  // 한 화면에 여러 개 그려도 그라데이션 · 마스크 id 가 겹치지 않게 한다.
-  // 겹치면 앞의 그림이 숨겨질 때 뒤 그림의 색이 사라진다. id 를 url() 에 넣으므로 영문 · 숫자만 남긴다
-  const prefix = `seal${useId().replace(/[^\w-]/g, "")}`;
-  const id = (name: string): string => `${prefix}-${name}`;
-  const url = (name: string): string => `url(#${id(name)})`;
-  // 멈춘 그림은 안쪽 움직임을 모두 끈다 (motion-safe 애니메이션보다 앞서도록 important)
-  const stillClass = isAnimated ? "" : "[&_*]:animate-none!";
+export function SealMascot({ isAnimated, className }: SealProps) {
+  const { id, url, svgClass } = useSealSvg({ isAnimated, className });
 
   return (
-    <svg viewBox="0 0 128 128" aria-hidden="true" className={`${className} ${stillClass}`}>
+    <svg viewBox="0 0 128 128" aria-hidden="true" className={svgClass}>
       <defs>
         <linearGradient id={id("fade-ramp")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0.76" stopColor="#ffffff" />
