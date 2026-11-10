@@ -185,7 +185,8 @@ class QAService(Protocol):
     - 캐시 적중이어도 같은 스키마를 돌려주고 meta.cache_hit=True 로 표시한다.
     - final_context 는 모델에 실제 전달한 문맥과 같아야 한다 (평가 입력).
     - request.session_id 가 있으면 끝난 질의응답을 세션 turn 으로 기록한다 (SessionService 참고).
-      세션 이력을 프롬프트에 쓰는 경우 캐시 키에 이력을 반영하거나 그 요청은 캐시를 우회한다.
+    - request.session_id 가 있으면 같은 세션의 이전 질의응답(turn)을 답변에 반영한다 (멀티턴).
+      반영할 turn 수와 방식은 구현이 정한다. 이력을 쓴 요청은 캐시 키에 이력을 반영하거나 캐시를 우회한다.
     """
 
     async def answer(self, request: QueryRequest, ctx: RequestContext) -> QAResult: ...
@@ -193,12 +194,14 @@ class QAService(Protocol):
 
 @runtime_checkable
 class SessionService(Protocol):
-    """세션 조회. 기록은 QAService 가 쓰고 이 서비스가 읽는다 (저장소는 Redis).
+    """세션 조회. 기록은 QAService 가 쓰고 이 서비스가 읽는다. 이력은 영구 저장되며 만료되지 않는다.
 
     계약
-    - 없거나 만료된 세션은 None 을 돌려준다 (예외 아님). 라우터가 404 + ApiError 로 바꾼다.
+    - 한 번도 기록되지 않은 세션은 None 을 돌려준다 (예외 아님). 라우터가 404 + ApiError 로 바꾼다.
+      세션은 만료되지 않으므로 SessionInfo.expires_at 은 항상 None 이다.
     - turns 는 오래된 것 → 최신 순으로 최근 limit 개만, turn_count 는 전체 개수.
     - status=error 응답은 turn 으로 기록하지 않는다.
+    - 기록하는 question 은 이메일·API 키 모양 문자열을 가린 값이다 (대화 복원 때 입력 원문과 다를 수 있다).
     - 세션 ID 를 아는 사람은 누구나 조회할 수 있다 (인증 없음). 추측 불가능한 값(UUID)을 쓴다.
     """
 
