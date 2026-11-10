@@ -6,6 +6,7 @@
 ::
 
     answer(request, ctx)
+      ├─ load_history(...)                  G3: session_id 가 있으면 이전 대화를 읽는다. 실패하면 단발로 답한다
       ├─ retriever.retrieve(...)            실패 → invalid_input / index_not_ready / retrieval_failed
       ├─ build_context(...)                 B: 토큰 예산 적용
       ├─ 문맥이 비면                         모델 호출 없이 abstained
@@ -22,7 +23,8 @@
 - 사용자용 오류 문구는 고정 문자열이다. 예외 메시지·스택·내부 주소를 넣지 않는다(서버 로그에만 남긴다).
 - `meta.latency_ms` 는 수신~반환 전체이고 실패에도 채운다. 토큰은 확인된 값만(모르면 None).
   모델 호출이 예외로 끝난 요청은 응답을 받지 못해 토큰을 알 수 없으므로 None 이다.
-- 세션 기록 실패는 응답을 실패로 만들지 않는다(기록만 건너뛴다).
+- 세션 기록 실패는 응답을 실패로 만들지 않는다(기록만 건너뛴다). 세션 이력 조회 실패도 마찬가지로 이력 없이 단발로 답한다.
+- 멀티턴은 이전 대화를 프롬프트에만 넣는다. 검색은 원문 질문으로 하고, 검색 자료(`final_context`)에는 이력이 들어가지 않는다.
 - Langfuse 기록(F)은 주입받은 `Tracer` 로 하고, 어떤 트레이서든 장애 격리 래퍼를 씌운다. `meta.trace_id` 는 기록을 시작했을 때만
   채운다(tracing.py 모듈 docstring 참고). 기록이 실패해도 응답은 그대로 나간다.
 """
@@ -38,9 +40,11 @@ from typing import Protocol
 
 from backend.chain import AnswerChain, ModelCallError, ModelTimeoutError
 from backend.context import ContextBuild, build_context, context_max_tokens
-from backend.prompts import PromptVariant, prompt_version
+from backend.history import HistorySource, history_max_turns, load_history
+from backend.prompts import HistoryTurn, PromptVariant, prompt_version
 from backend.tracing import (
     STEP_CONTEXT,
+    STEP_HISTORY,
     STEP_RETRIEVE,
     NoopTracer,
     RequestTrace,
@@ -49,6 +53,7 @@ from backend.tracing import (
     guard,
     redact,
     summarize_context,
+    summarize_history,
     summarize_retrieved,
 )
 from backend.validate import ValidatedAnswer, generate_validated
@@ -132,10 +137,13 @@ class BackendQAService:
         k: int = DEFAULT_K,
         variant: PromptVariant = PromptVariant.BASE,
         tracer: Tracer | None = None,
+        history: HistorySource | None = None,
     ) -> None:
         self._retriever = retriever
         self._chain = chain
         self._sessions = sessions
+        # 멀티턴: 이력을 읽을 저장소(보통 `sessions` 와 같은 객체). 없으면 단발로만 동작한다.
+        self._history = history
         self._default_mode = default_mode
         self._k = k
         self._variant = variant
@@ -187,6 +195,8 @@ class BackendQAService:
             )
             return QAResult(response=resp, final_context=final_context())  # 오류는 세션에 기록하지 않는다
 
+        history = await self._load_history(request, ctx, trace)  # 실패해도 예외 없이 빈 이력이다
+
         try:
             active = trace.step(STEP_RETRIEVE, {"mode": mode.value, "k": self._k})
             retrieved = await self._retriever.retrieve(
@@ -212,7 +222,12 @@ class BackendQAService:
                 )
 
             outcome = await generate_validated(
-                self._chain, request.question, context, self._variant, callbacks=trace.callbacks() or None
+                self._chain,
+                request.question,
+                context,
+                self._variant,
+                history=history,
+                callbacks=trace.callbacks() or None,
             )
         except Exception as exc:  # noqa: BLE001 - 계약: 예외를 던지지 않고 error 응답으로 바꾼다
             code = error_code_for(exc)
@@ -245,6 +260,28 @@ class BackendQAService:
             validated.citations,
             context.items,
         )
+
+    async def _load_history(self, request: QueryRequest, ctx: RequestContext, trace: RequestTrace) -> list[HistoryTurn]:
+        """같은 세션의 이전 대화를 읽는다. 세션이 없거나 멀티턴이 꺼져 있으면 빈 목록이다.
+
+        이력은 답변을 돕는 부가 정보라서 읽기에 실패해도 응답을 실패로 만들지 않고 이력 없이(단발로) 답한다.
+        """
+        if self._history is None or not request.session_id:
+            return []
+        max_turns = history_max_turns()
+        if max_turns <= 0:
+            return []
+        step = trace.step(STEP_HISTORY, {"max_turns": max_turns})
+        try:
+            history = await load_history(self._history, request.session_id, max_turns=max_turns)
+        except Exception:  # noqa: BLE001 - 이력을 못 읽어도 단발로 답한다
+            logger.warning("세션 이력을 읽지 못해 단발로 답한다 request_id=%s", ctx.request_id, exc_info=True)
+            step.end(error="history_unavailable")
+            trace.annotate(history_error=True, history_turns=0)
+            return []
+        step.end(summarize_history(len(history), max_turns))
+        trace.annotate(history_turns=len(history))
+        return history
 
     async def _finish(
         self,
