@@ -31,12 +31,16 @@ function retrievalModeOf(value: string | undefined): RetrievalMode {
 }
 
 /**
- * 기본 검색 방식. 검색 방식 선택 상자에서 처음 고른 값이 된다.
+ * 기본 검색 방식. 선택 상자를 숨기면 늘 이 방식으로 검색하고, 보이면 처음 고른 값이 된다.
  * VITE_DEFAULT_RETRIEVAL_MODE(naive · hybrid · hybrid_rerank)로 바꾼다. 비었거나 모르는 값이면 hybrid_rerank 다
  */
 export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = retrievalModeOf(
   import.meta.env.VITE_DEFAULT_RETRIEVAL_MODE,
 );
+
+/** 머리줄의 검색 방식 선택 상자를 보여 줄지. VITE_RETRIEVAL_MODE_SELECT=on 일 때만 보이고, 비었거나 off 면 숨긴다 */
+export const SHOW_RETRIEVAL_MODE_SELECT: boolean =
+  import.meta.env.VITE_RETRIEVAL_MODE_SELECT?.trim().toLowerCase() === "on";
 
 /** 대화 목록 저장소 키 */
 export const HISTORY_STORAGE_KEY = "shipping-rag:conversations:v1";

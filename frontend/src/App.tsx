@@ -15,7 +15,7 @@ import { useDrawer } from "./hooks/useDrawer";
 import { useHealth, type HealthState } from "./hooks/useHealth";
 import { useTheme } from "./hooks/useTheme";
 import { isAwaitingClarification } from "./lib/chat";
-import { DEFAULT_RETRIEVAL_MODE } from "./lib/config";
+import { DEFAULT_RETRIEVAL_MODE, SHOW_RETRIEVAL_MODE_SELECT } from "./lib/config";
 
 /** 마지막 답이 되묻기일 때 입력창 안내 */
 const CLARIFY_PLACEHOLDER = "빠진 조건을 넣어 질문을 다시 보내 주세요";
@@ -45,7 +45,10 @@ function supportedModesOf(health: HealthState): readonly RetrievalMode[] {
   return RETRIEVAL_MODES;
 }
 
-/** 업무 Q&A 화면: 사이드바(새 대화 · 대화 목록 · 서버 상태) + 머리줄(검색 방식 · 테마) + 대화 + 입력창 */
+/**
+ * 업무 Q&A 화면: 사이드바(새 대화 · 대화 목록 · 서버 상태) + 머리줄(검색 방식 · 테마) + 대화 + 입력창.
+ * 검색 방식 선택 상자는 설정(SHOW_RETRIEVAL_MODE_SELECT)으로 켤 때만 보인다
+ */
 export function App() {
   const health = useHealth();
   const chat = useChat();
@@ -151,12 +154,15 @@ export function App() {
           {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
           <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <RetrievalModeSelect
-              value={mode}
-              onChange={setRetrievalMode}
-              modes={modes}
-              disabled={chat.isBusy}
-            />
+            {/* 검색 방식 선택 상자는 설정으로 켤 때만 보인다. 숨기면 기본 검색 방식으로 검색한다 */}
+            {SHOW_RETRIEVAL_MODE_SELECT ? (
+              <RetrievalModeSelect
+                value={mode}
+                onChange={setRetrievalMode}
+                modes={modes}
+                disabled={chat.isBusy}
+              />
+            ) : null}
             <ThemeSelect value={theme} onChange={setTheme} />
           </div>
         </header>
