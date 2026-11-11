@@ -108,6 +108,7 @@ docker compose up -d qdrant redis                     # 인프라만 (목업 단
 docker compose up -d --build                          # 전체(api 포함, app/ 과 uv.lock 이 있어야 빌드된다)
 docker compose --profile tools run --rm cli index     # 배치 CLI 실행 (데이터는 ./data 를 읽기 전용으로 마운트)
 docker compose restart api                            # 색인(재색인 포함) 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build   # (선택) 컨테이너에서 GPU 사용. NVIDIA 드라이버와 컨테이너 GPU 지원이 있는 호스트에서만
 uv sync
 uv run uvicorn app.api:create_app --factory           # 호스트에서 api 실행 (팩토리 방식)
 uv run python -m app.cli index [--rebuild]            # 색인. 같은 index_name 은 --rebuild 로만 덮어쓴다
