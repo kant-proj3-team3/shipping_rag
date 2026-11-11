@@ -18,9 +18,10 @@ interface HistoryListProps {
   activeId: string | undefined;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
-  /** 방금 지운 대화. 목록에서 원래 있던 자리에 남은 초와 실행 취소 안내를 보여 준다 */
-  lastDeleted: DeletedConversation | undefined;
-  onUndoRemove: () => void;
+  /** 지운 뒤 아직 실행 취소를 받는 대화들. 목록에서 원래 있던 자리마다 남은 초와 실행 취소 안내를 보여 준다 */
+  recentlyDeleted: DeletedConversation[];
+  /** 지운 대화 하나를 되돌린다 */
+  onUndoRemove: (id: string) => void;
 }
 
 interface DateGroup {
@@ -101,9 +102,11 @@ function DeletedItem({ title, deadline, onUndo }: DeletedItemProps) {
           {seconds}
         </span>
         <span className="min-w-0 flex-1 truncate text-zinc-500">삭제됨: {title}</span>
+        {/* 지운 대화가 여럿이면 실행 취소 버튼도 여럿이라 이름에 제목을 붙여 구분한다 */}
         <button
           type="button"
           onClick={onUndo}
+          aria-label={`실행 취소: ${title}`}
           className="shrink-0 text-xs font-medium underline underline-offset-2"
         >
           실행 취소
@@ -113,13 +116,14 @@ function DeletedItem({ title, deadline, onUndo }: DeletedItemProps) {
   );
 }
 
-// 목록에 방금 지운 대화를 다시 끼운다. 최근 활동순이라 지우기 전에 있던 자리에 들어간다
+// 목록에 지운 대화들을 다시 끼운다. 최근 활동순이라 지우기 전에 있던 자리에 들어간다
 function withDeleted(
   conversations: Conversation[],
-  deleted: Conversation | undefined,
+  deleted: DeletedConversation[],
 ): Conversation[] {
-  const isListed = deleted !== undefined && conversations.some((c) => c.id === deleted.id);
-  return deleted === undefined || isListed ? conversations : [...conversations, deleted];
+  const listedIds = new Set(conversations.map((c) => c.id));
+  const unlisted = deleted.map((d) => d.conversation).filter((c) => !listedIds.has(c.id));
+  return unlisted.length === 0 ? conversations : [...conversations, ...unlisted];
 }
 
 function HistoryListView({
@@ -128,11 +132,13 @@ function HistoryListView({
   activeId,
   onSelect,
   onRemove,
-  lastDeleted,
+  recentlyDeleted,
   onUndoRemove,
 }: HistoryListProps) {
   const now = useNow();
-  const listed = withDeleted(conversations, lastDeleted?.conversation);
+  const listed = withDeleted(conversations, recentlyDeleted);
+  // 지운 대화 → 실행 취소를 그만 받는 시각. 같은 id 로 다시 생긴 대화와 헷갈리지 않게 대화 객체로 찾는다
+  const deadlineOf = new Map(recentlyDeleted.map((d) => [d.conversation, d.deadline]));
   if (listed.length === 0) {
     return <p className="px-1 text-xs text-zinc-500">아직 대화가 없습니다.</p>;
   }
@@ -145,13 +151,14 @@ function HistoryListView({
           <ul className="space-y-0.5">
             {items.map((c) => {
               const title = titleOf(c);
-              if (c === lastDeleted?.conversation) {
+              const deadline = deadlineOf.get(c);
+              if (deadline !== undefined) {
                 return (
                   <DeletedItem
                     key={c.id}
                     title={title}
-                    deadline={lastDeleted.deadline}
-                    onUndo={onUndoRemove}
+                    deadline={deadline}
+                    onUndo={() => onUndoRemove(c.id)}
                   />
                 );
               }
@@ -200,7 +207,7 @@ function HistoryListView({
 }
 
 /**
- * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다. 방금 지운 대화는 그 자리에 남은 초와 실행 취소 안내로 남긴다.
+ * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다. 지운 대화는 실행 취소를 받는 동안 대화마다 그 자리에 남은 초와 실행 취소 안내로 남긴다.
  * 대화가 수백 개일 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
  */
 export const HistoryList = memo(HistoryListView);
