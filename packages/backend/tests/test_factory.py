@@ -68,9 +68,15 @@ def test_real_gives_real_services(monkeypatch, raw):
     assert isinstance(backend.create_session_service(), SessionQueryService)
 
 
-def test_answer_evaluator_stays_mock_until_stage_j(monkeypatch):
-    monkeypatch.setenv("BACKEND_IMPL", "real")
+def test_answer_evaluator_follows_backend_impl(monkeypatch):
+    from backend.evaluator import BackendAnswerEvaluator
+
+    monkeypatch.delenv("BACKEND_IMPL", raising=False)
     assert isinstance(backend.create_answer_evaluator(None), MockAnswerEvaluator)
+    monkeypatch.setenv("BACKEND_IMPL", "real")
+    # 키가 없어도 만들어진다(모델 클라이언트는 첫 평가 때 만든다)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert isinstance(backend.create_answer_evaluator(None), BackendAnswerEvaluator)
 
 
 # ── 세션 저장소 공유 ──
