@@ -123,7 +123,7 @@ export function App() {
           onNewChat={handleNewChat}
           onSelect={handleSelect}
           onRemove={chat.remove}
-          lastDeleted={chat.lastDeleted}
+          recentlyDeleted={chat.recentlyDeleted}
           onUndoRemove={chat.undoRemove}
           saveResult={chat.saveResult}
         />

@@ -15,9 +15,10 @@ interface SidebarProps {
   onNewChat: () => void;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
-  /** 방금 지운 대화. 대화 목록의 그 자리에 남은 초와 실행 취소 안내를 보여 준다 */
-  lastDeleted: DeletedConversation | undefined;
-  onUndoRemove: () => void;
+  /** 지운 뒤 아직 실행 취소를 받는 대화들. 대화 목록의 그 자리마다 남은 초와 실행 취소 안내를 보여 준다 */
+  recentlyDeleted: DeletedConversation[];
+  /** 지운 대화 하나를 되돌린다 */
+  onUndoRemove: (id: string) => void;
   /** 대화 목록의 마지막 저장 결과. saved 가 아니면 경고를 보인다 */
   saveResult: SaveResult;
 }
@@ -31,7 +32,7 @@ export function Sidebar({
   onNewChat,
   onSelect,
   onRemove,
-  lastDeleted,
+  recentlyDeleted,
   onUndoRemove,
   saveResult,
 }: SidebarProps) {
@@ -56,7 +57,7 @@ export function Sidebar({
           activeId={activeId}
           onSelect={onSelect}
           onRemove={onRemove}
-          lastDeleted={lastDeleted}
+          recentlyDeleted={recentlyDeleted}
           onUndoRemove={onUndoRemove}
         />
       </nav>

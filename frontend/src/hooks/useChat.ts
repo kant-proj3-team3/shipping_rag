@@ -50,8 +50,8 @@ export interface UseChatResult {
   isSessionGone: boolean;
   /** 마지막 저장 결과 */
   saveResult: SaveResult;
-  /** 방금 지워서 실행 취소할 수 있는 대화 */
-  lastDeleted: DeletedConversation | undefined;
+  /** 지운 뒤 아직 실행 취소를 받는 대화들 (지운 순서) */
+  recentlyDeleted: DeletedConversation[];
   /** 보고 있는 대화에 질문을 보낸다. 받는 중 · 확인 중이거나 빈 질문이면 보내지 않고 false */
   send: (question: string, retrievalMode: RetrievalMode) => boolean;
   /** 받는 중인 답변을 멈춘다 */
@@ -62,8 +62,8 @@ export interface UseChatResult {
   select: (id: string) => void;
   /** 대화를 지운다. 받는 중인 대화는 지우지 않는다 */
   remove: (id: string) => void;
-  /** 방금 지운 대화를 되돌린다 */
-  undoRemove: () => void;
+  /** 지운 대화 하나를 되돌린다. 실행 취소 시간이 지났으면 아무 일도 없다 */
+  undoRemove: (id: string) => void;
 }
 
 /**
@@ -79,7 +79,7 @@ export function useChat(): UseChatResult {
   const storage = useStorage();
   const { history, historyRef, saveResult, updateHistory } = useChatHistory();
   const {
-    lastDeleted,
+    recentlyDeleted,
     remove: removeConversation,
     undoRemove,
   } = useUndoDelete({ historyRef, updateHistory });
@@ -260,7 +260,7 @@ export function useChat(): UseChatResult {
     isChecking: status === "checking",
     isSessionGone: status === "gone",
     saveResult,
-    lastDeleted,
+    recentlyDeleted,
     send,
     stop,
     newChat,
