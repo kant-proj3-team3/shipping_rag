@@ -52,7 +52,7 @@ function Eyes({ svg, eyes }: EyesProps) {
         <path d="M -15.5 -7.5 l 4 -1.4" />
         <path d="M 11.5 -8.9 l 4 1.4" />
       </g>
-      <g className="origin-center transform-fill motion-safe:animate-seal-blink">
+      <g data-seal-blink className="origin-center transform-fill motion-safe:animate-seal-blink">
         <ellipse cx="-12.5" cy="2" rx="5" ry="5.6" fill={svg.url("iris")} />
         <ellipse cx="12.5" cy="2" rx="5" ry="5.6" fill={svg.url("iris")} />
         <g fill="#ffffff">

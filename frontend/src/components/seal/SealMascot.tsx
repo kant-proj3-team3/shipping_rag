@@ -43,7 +43,10 @@ export function SealMascot(props: SealProps) {
 
       <g mask={svg.url("fade")}>
         <g fill="#ffd84a" stroke="#f2a93b" strokeWidth="1.2">
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark"
+          >
             <rect
               x="15.7"
               y="5.2"
@@ -53,7 +56,10 @@ export function SealMascot(props: SealProps) {
               transform="rotate(58 22.2 8.5)"
             />
           </g>
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark-2">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark-2"
+          >
             <rect
               x="3.6"
               y="14.6"
@@ -63,7 +69,10 @@ export function SealMascot(props: SealProps) {
               transform="rotate(35 11 17.9)"
             />
           </g>
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark-3">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark-3"
+          >
             <rect
               x="1.5"
               y="28"
@@ -105,7 +114,10 @@ export function SealMascot(props: SealProps) {
             <path d="M83.5 54.5l6.5-1.5" />
           </g>
 
-          <g className="origin-[37.5px_55px] transform-view motion-safe:animate-seal-blink">
+          <g
+            data-seal-blink
+            className="origin-[37.5px_55px] transform-view motion-safe:animate-seal-blink"
+          >
             <ellipse
               cx="37.5"
               cy="54.6"
@@ -195,7 +207,10 @@ export function SealMascot(props: SealProps) {
           </g>
         </g>
 
-        <g className="origin-[14px_95px] transform-view motion-safe:animate-seal-pump">
+        <g
+          data-seal-paw
+          className="origin-[14px_95px] transform-view motion-safe:animate-seal-pump"
+        >
           <path
             fill={svg.url("paw")}
             stroke="#2a1c1c"
@@ -211,7 +226,10 @@ export function SealMascot(props: SealProps) {
           />
         </g>
 
-        <g className="origin-[98px_120px] transform-view motion-safe:animate-seal-pump-late">
+        <g
+          data-seal-paw
+          className="origin-[98px_120px] transform-view motion-safe:animate-seal-pump-late"
+        >
           <path
             fill={svg.url("paw")}
             stroke="#2a1c1c"

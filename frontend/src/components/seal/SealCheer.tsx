@@ -70,7 +70,10 @@ export function SealCheer(props: SealProps) {
         <SealFace svg={svg} headX={HEAD_X} headY={HEAD_Y} eyes="squint" mouth="open" />
 
         {/* 응원 술은 손에 쥔 채 손 앞에 온다: 손을 먼저 그리고 술로 덮는다 */}
-        <g className="origin-[36px_90px] transform-view motion-safe:animate-seal-shake">
+        <g
+          data-seal-paw
+          className="origin-[36px_90px] transform-view motion-safe:animate-seal-shake"
+        >
           <path
             fill={svg.url("fur")}
             stroke={SEAL_INK}
@@ -83,7 +86,10 @@ export function SealCheer(props: SealProps) {
             <path d="M 22 74 l -3 -3 M 28 72 l 1 -4 M 20 84 l -4 1 M 31 80 l 4 -1" />
           </g>
         </g>
-        <g className="origin-[94px_102px] transform-view motion-safe:animate-seal-shake-late">
+        <g
+          data-seal-paw
+          className="origin-[94px_102px] transform-view motion-safe:animate-seal-shake-late"
+        >
           <path
             fill={svg.url("fur")}
             stroke={SEAL_INK}

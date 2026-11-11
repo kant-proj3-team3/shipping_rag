@@ -177,6 +177,18 @@
   }
 }
 
+/* 잔잔한 움직임(useSealSvg 의 isSubtle)에서 반짝임이 크기 변화 없이 밝기만 바뀐다.
+   animate-* 유틸리티가 아니라 keyframes 이름으로만 쓰므로 @theme 밖에 둔다 (@theme 의 keyframes 는 animate-* 가 쓰일 때만 나온다) */
+@keyframes seal-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @layer base {
   html,
   body,
