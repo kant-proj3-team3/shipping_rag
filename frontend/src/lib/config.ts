@@ -1,6 +1,10 @@
 // 설정값은 이 파일 한 곳에 모은다.
 
-import { QUERY_REQUEST_QUESTION_MAX_LENGTH, type RetrievalMode } from "../api/types";
+import {
+  QUERY_REQUEST_QUESTION_MAX_LENGTH,
+  RETRIEVAL_MODES,
+  type RetrievalMode,
+} from "../api/types";
 
 /** API 주소. 비우면 같은 주소의 상대 경로(개발 중에는 Vite 프록시)로 보낸다 */
 export const API_BASE: string = import.meta.env.VITE_API_BASE ?? "";
@@ -17,8 +21,22 @@ export const PENDING_SHOW_DELAY_MS = 300;
 /** 답변 대기 표시가 한번 보이면 최소 이만큼은 둔다. 나타나자마자 사라지지 않게 한다 */
 export const PENDING_MIN_VISIBLE_MS = 500;
 
-/** 처음 고른 검색 방식. 세 방식 중 품질 기대가 가장 높은 방식이다 */
-export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
+/** 프로젝트 기본 검색 방식 (하이브리드 + 리랭킹). VITE_DEFAULT_RETRIEVAL_MODE 가 없을 때 쓴다 */
+const PROJECT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
+
+// 설정 글자를 검색 방식으로 읽는다. 비었거나 모르는 값이면 프로젝트 기본 검색 방식이다
+function retrievalModeOf(value: string | undefined): RetrievalMode {
+  const trimmed = value?.trim();
+  return RETRIEVAL_MODES.find((mode) => mode === trimmed) ?? PROJECT_RETRIEVAL_MODE;
+}
+
+/**
+ * 기본 검색 방식. 검색 방식 선택 상자에서 처음 고른 값이 된다.
+ * VITE_DEFAULT_RETRIEVAL_MODE(naive · hybrid · hybrid_rerank)로 바꾼다. 비었거나 모르는 값이면 hybrid_rerank 다
+ */
+export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = retrievalModeOf(
+  import.meta.env.VITE_DEFAULT_RETRIEVAL_MODE,
+);
 
 /** 대화 목록 저장소 키 */
 export const HISTORY_STORAGE_KEY = "shipping-rag:conversations:v1";
