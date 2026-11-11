@@ -2,7 +2,7 @@
   "name": "shipping-rag-web",
   "private": true,
   "version": "0.0.0",
-  "ragContract": "0.1.0",
+  "ragContract": "0.1.1",
   "type": "module",
   "workspaces": [
     "server"

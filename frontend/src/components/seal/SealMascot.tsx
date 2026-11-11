@@ -5,45 +5,48 @@ import { useSealSvg, type SealProps } from "./useSealSvg";
  *
  * 옆의 글이 설명을 맡으므로 스크린 리더에는 숨긴다.
  */
-export function SealMascot({ isAnimated, className }: SealProps) {
-  const { id, url, svgClass } = useSealSvg({ isAnimated, className });
+export function SealMascot(props: SealProps) {
+  const svg = useSealSvg(props);
 
   return (
-    <svg viewBox="0 0 128 128" aria-hidden="true" className={svgClass}>
+    <svg viewBox="0 0 128 128" aria-hidden="true" className={svg.svgClass}>
       <defs>
-        <linearGradient id={id("fade-ramp")} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={svg.id("fade-ramp")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0.76" stopColor="#ffffff" />
           <stop offset="1" stopColor="#000000" />
         </linearGradient>
-        <mask id={id("fade")} maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
-          <rect width="128" height="128" fill={url("fade-ramp")} />
+        <mask id={svg.id("fade")} maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+          <rect width="128" height="128" fill={svg.url("fade-ramp")} />
         </mask>
-        <clipPath id={id("mouth")}>
+        <clipPath id={svg.id("mouth")}>
           <path d="M48.5 78C52 77.5 57 74 59 71c2 3 5 5 8.5 5.5C67 84 62 91.5 56 91.5c-5.5 0-8.5-7.5-7.5-13.5Z" />
         </clipPath>
-        <linearGradient id={id("fur")} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={svg.id("fur")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
           <stop offset="0.65" stopColor="#fbfafb" />
           <stop offset="1" stopColor="#e6e4f2" />
         </linearGradient>
-        <linearGradient id={id("paw")} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={svg.id("paw")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
           <stop offset="1" stopColor="#e9e7f4" />
         </linearGradient>
-        <linearGradient id={id("band")} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={svg.id("band")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#3f73e6" />
           <stop offset="1" stopColor="#2450c2" />
         </linearGradient>
-        <radialGradient id={id("iris")} cx="0.5" cy="0.85" r="0.75">
+        <radialGradient id={svg.id("iris")} cx="0.5" cy="0.85" r="0.75">
           <stop offset="0" stopColor="#4a6fc9" />
           <stop offset="1" stopColor="#1b1a33" />
         </radialGradient>
-        <path id={id("band-line")} d="M35 29.5C58 27 86 37 108 53" />
+        <path id={svg.id("band-line")} d="M35 29.5C58 27 86 37 108 53" />
       </defs>
 
-      <g mask={url("fade")}>
+      <g mask={svg.url("fade")}>
         <g fill="#ffd84a" stroke="#f2a93b" strokeWidth="1.2">
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark"
+          >
             <rect
               x="15.7"
               y="5.2"
@@ -53,7 +56,10 @@ export function SealMascot({ isAnimated, className }: SealProps) {
               transform="rotate(58 22.2 8.5)"
             />
           </g>
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark-2">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark-2"
+          >
             <rect
               x="3.6"
               y="14.6"
@@ -63,7 +69,10 @@ export function SealMascot({ isAnimated, className }: SealProps) {
               transform="rotate(35 11 17.9)"
             />
           </g>
-          <g className="origin-center transform-fill motion-safe:animate-seal-spark-3">
+          <g
+            data-seal-spark
+            className="origin-center transform-fill motion-safe:animate-seal-spark-3"
+          >
             <rect
               x="1.5"
               y="28"
@@ -77,7 +86,7 @@ export function SealMascot({ isAnimated, className }: SealProps) {
 
         <g className="origin-[64px_128px] transform-view motion-safe:animate-seal-bob">
           <path
-            fill={url("fur")}
+            fill={svg.url("fur")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M2 130V84C3 70 6 56 14 44 24 20 50 3 76 3c22 0 37 14 44 35 5 18 6 46 6 92Z"
@@ -105,13 +114,16 @@ export function SealMascot({ isAnimated, className }: SealProps) {
             <path d="M83.5 54.5l6.5-1.5" />
           </g>
 
-          <g className="origin-[37.5px_55px] transform-view motion-safe:animate-seal-blink">
+          <g
+            data-seal-blink
+            className="origin-[37.5px_55px] transform-view motion-safe:animate-seal-blink"
+          >
             <ellipse
               cx="37.5"
               cy="54.6"
               rx="9.6"
               ry="10.2"
-              fill={url("iris")}
+              fill={svg.url("iris")}
               transform="rotate(12 37.5 54.6)"
             />
             <circle cx="35.5" cy="50.3" r="3.2" fill="#ffffff" />
@@ -139,7 +151,7 @@ export function SealMascot({ isAnimated, className }: SealProps) {
             strokeLinejoin="round"
             d="M48.5 78C52 77.5 57 74 59 71c2 3 5 5 8.5 5.5C67 84 62 91.5 56 91.5c-5.5 0-8.5-7.5-7.5-13.5Z"
           />
-          <g clipPath={url("mouth")}>
+          <g clipPath={svg.url("mouth")}>
             <path fill="#f08c84" d="M47 87c3-5 15-7 21-3v9H47Z" />
           </g>
           <path
@@ -167,7 +179,7 @@ export function SealMascot({ isAnimated, className }: SealProps) {
           </g>
 
           <path
-            fill={url("band")}
+            fill={svg.url("band")}
             stroke="#14224f"
             strokeWidth="2"
             strokeLinejoin="round"
@@ -184,7 +196,7 @@ export function SealMascot({ isAnimated, className }: SealProps) {
             d="M120.5 42C122 48 122.2 58 120.3 69L119.8 74.2C121 71.6 122 68.8 122.7 65.5 123.3 64 123.6 62.5 123.8 60.2 124.6 58 124.6 55.5 123.9 53 124.5 51 124.4 49 123.4 46.6 122.6 45 121.6 43.4 120.5 42Z"
           />
           <text fontSize="10.5" fontWeight="800" fill="#ffffff">
-            <textPath href={`#${id("band-line")}`}>오늘도 해내자!</textPath>
+            <textPath href={`#${svg.id("band-line")}`}>오늘도 해내자!</textPath>
           </text>
           <g fill="#ffffff">
             <ellipse cx="113.8" cy="53" rx="3.3" ry="2.7" />
@@ -195,9 +207,12 @@ export function SealMascot({ isAnimated, className }: SealProps) {
           </g>
         </g>
 
-        <g className="origin-[14px_95px] transform-view motion-safe:animate-seal-pump">
+        <g
+          data-seal-paw
+          className="origin-[14px_95px] transform-view motion-safe:animate-seal-pump"
+        >
           <path
-            fill={url("paw")}
+            fill={svg.url("paw")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M1 84C3 75 11 69 18 70c8 2 12 10 11 17-1 5-4 9-8 10-7 2-14 1-19-3-2-3-2-7-1-10Z"
@@ -211,9 +226,12 @@ export function SealMascot({ isAnimated, className }: SealProps) {
           />
         </g>
 
-        <g className="origin-[98px_120px] transform-view motion-safe:animate-seal-pump-late">
+        <g
+          data-seal-paw
+          className="origin-[98px_120px] transform-view motion-safe:animate-seal-pump-late"
+        >
           <path
-            fill={url("paw")}
+            fill={svg.url("paw")}
             stroke="#2a1c1c"
             strokeWidth="2.2"
             d="M77 102c1-8 9-12.5 19-12.5 10 .5 20 6.5 22 16.5 1 8-2 14-6 18-12 3-26 1-31-6-3-5-4.5-11-4-16Z"

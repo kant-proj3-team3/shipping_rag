@@ -84,6 +84,13 @@ function isServerAnswer(message: Message): boolean {
   );
 }
 
+// 서버 기록 여부를 모르는 답변: 응답을 받지 못했거나 중지했어도 서버는 답을 끝내 기록했을 수 있다
+function isUncertainAnswer(message: Message): boolean {
+  return (
+    message.role === "assistant" && (message.state === "failed" || message.state === "stopped")
+  );
+}
+
 /**
  * 추측할 수 없는 UUID v4. 세션 id 와 메시지 id 에 쓴다.
  * crypto.randomUUID 는 보안 컨텍스트(HTTPS · localhost)에만 있어, HTTP 주소에서도 있는 crypto.getRandomValues 로 만든다
@@ -143,7 +150,7 @@ export function hasServerTurn(messages: Message[]): boolean {
 
 /**
  * 받지 못하고 중지로 남은 마지막 답변을 서버 기록으로 채울 내용. 새로고침 · 탭 닫기로 끊겨도 서버는 답을 끝내 기록할 수 있다.
- * 마지막 질문과 서버의 마지막 기록이 같고, 서버 기록이 브라우저에 있는 답보다 많을 때만 채운다
+ * 서버의 마지막 기록이 그 질문의 것일 때만 채운다
  *
  * @returns 채울 답변. 채울 것이 없으면 undefined
  */
@@ -153,15 +160,21 @@ export function stoppedAnswerFromSession(
 ): { answerId: string; answer: Answer } | undefined {
   const last = conversation.messages.at(-1);
   const turn = info.turns.at(-1);
-  if (
-    last?.role !== "assistant" ||
-    last.state !== "stopped" ||
-    turn?.question !== last.question ||
-    conversation.messages.filter(isServerAnswer).length >= info.turnCount
-  ) {
+  if (last?.role !== "assistant" || last.state !== "stopped" || turn === undefined) {
     return undefined;
   }
-  return { answerId: last.id, answer: answerFromTurn(turn) };
+  const earlier = conversation.messages.slice(0, -1);
+  const recordedCount = earlier.filter(isServerAnswer).length;
+  // 서버 기록이 브라우저의 답보다 많지 않으면 마지막 질문은 아직 기록되지 않았다
+  if (recordedCount >= info.turnCount) {
+    return undefined;
+  }
+  // 서버는 질문의 이메일 · 키 모양 문자열을 가려 기록해 글자가 다를 수 있다.
+  // 앞의 답이 모두 기록 여부가 정해져 있고 서버 기록이 꼭 하나 더 많으면, 그 하나는 마지막 질문의 것이다
+  const isLastQuestionTurn =
+    turn.question === last.question ||
+    (info.turnCount === recordedCount + 1 && !earlier.some(isUncertainAnswer));
+  return isLastQuestionTurn ? { answerId: last.id, answer: answerFromTurn(turn) } : undefined;
 }
 
 /** 질문 하나를 보낼 때 쓰는 id 와 시각. 부르는 쪽이 만들어 넘겨 함수는 순수하게 둔다 */

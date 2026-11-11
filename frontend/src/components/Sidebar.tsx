@@ -1,7 +1,8 @@
 import { HistoryList } from "./HistoryList";
 import { ServerStatus } from "./ServerStatus";
 import type { HealthState } from "../hooks/useHealth";
-import { titleOf, type Conversation } from "../lib/chat";
+import type { DeletedConversation } from "../hooks/useUndoDelete";
+import type { Conversation } from "../lib/chat";
 import type { SaveResult } from "../lib/history";
 import { SAVE_WARNING_TEXT } from "../lib/labels";
 
@@ -14,8 +15,8 @@ interface SidebarProps {
   onNewChat: () => void;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
-  /** 방금 지운 대화 (실행 취소 안내) */
-  lastDeleted: Conversation | undefined;
+  /** 방금 지운 대화. 대화 목록의 그 자리에 남은 초와 실행 취소 안내를 보여 준다 */
+  lastDeleted: DeletedConversation | undefined;
   onUndoRemove: () => void;
   /** 대화 목록의 마지막 저장 결과. saved 가 아니면 경고를 보인다 */
   saveResult: SaveResult;
@@ -55,25 +56,12 @@ export function Sidebar({
           activeId={activeId}
           onSelect={onSelect}
           onRemove={onRemove}
+          lastDeleted={lastDeleted}
+          onUndoRemove={onUndoRemove}
         />
       </nav>
 
       <div className="space-y-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
-        {lastDeleted ? (
-          <div
-            role="status"
-            className="flex items-center justify-between gap-2 rounded-lg bg-zinc-200 px-3 py-1.5 text-xs dark:bg-zinc-800"
-          >
-            <span className="min-w-0 truncate">삭제됨: {titleOf(lastDeleted)}</span>
-            <button
-              type="button"
-              onClick={onUndoRemove}
-              className="shrink-0 font-medium underline underline-offset-2"
-            >
-              실행 취소
-            </button>
-          </div>
-        ) : null}
         {saveResult !== "saved" ? (
           <p role="status" className="text-xs text-amber-700 dark:text-amber-400">
             {SAVE_WARNING_TEXT[saveResult]}

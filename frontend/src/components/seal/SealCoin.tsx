@@ -10,8 +10,8 @@ const BODY_PATH = "M 36 66 C 26 84 28 110 44 117 C 58 123 72 123 86 117 C 102 11
  * 금화를 두 손으로 꼭 안은 물개: LLM 머리띠, 웃는 눈.
  * 움직이면 금화를 든 손이 들썩이고 금화가 반짝이며 왼쪽 위 반짝임이 깜박인다
  */
-export function SealCoin({ isAnimated, className }: SealProps) {
-  const svg = useSealSvg({ isAnimated, className });
+export function SealCoin(props: SealProps) {
+  const svg = useSealSvg(props);
 
   return (
     <svg viewBox="0 0 128 128" aria-hidden="true" className={svg.svgClass}>
@@ -23,13 +23,19 @@ export function SealCoin({ isAnimated, className }: SealProps) {
       </defs>
 
       <g fill="none" stroke="#ffcf3a" strokeWidth="3.2" strokeLinecap="round">
-        <g className="origin-center transform-fill motion-safe:animate-seal-spark">
+        <g data-seal-spark className="origin-center transform-fill motion-safe:animate-seal-spark">
           <path d="M 17 31 l -7 -3" />
         </g>
-        <g className="origin-center transform-fill motion-safe:animate-seal-spark-2">
+        <g
+          data-seal-spark
+          className="origin-center transform-fill motion-safe:animate-seal-spark-2"
+        >
           <path d="M 21 22 l -5 -6" />
         </g>
-        <g className="origin-center transform-fill motion-safe:animate-seal-spark-3">
+        <g
+          data-seal-spark
+          className="origin-center transform-fill motion-safe:animate-seal-spark-3"
+        >
           <path d="M 29.5 17 l -1.5 -7.5" />
         </g>
       </g>
@@ -38,7 +44,7 @@ export function SealCoin({ isAnimated, className }: SealProps) {
         <SealSilhouette svg={svg} headX={HEAD_X} headY={HEAD_Y} body={BODY_PATH} />
         <SealFace svg={svg} headX={HEAD_X} headY={HEAD_Y} eyes="happy" mouth="smile" />
 
-        <g className="motion-safe:animate-seal-hug">
+        <g data-seal-paw className="motion-safe:animate-seal-hug">
           <circle cx="64" cy="91" r="15" fill={svg.url("coin")} stroke={SEAL_INK} strokeWidth="2" />
           <circle cx="64" cy="91" r="11" fill="none" stroke="#d99a2b" strokeWidth="1.6" />
           <path

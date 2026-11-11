@@ -87,7 +87,7 @@ export function readQueryResponse({ status, body }: HttpResult): QueryResponse {
 /**
  * GET /session/{session_id} 응답을 읽는다.
  *
- * @returns 없거나 만료된 세션(404 + session_not_found)이면 null
+ * @returns 서버에 기록이 없는 세션(404 + session_not_found)이면 null
  * @throws RequestError 422 거절, 서버에 닿지 못함(network), 형식이 계약과 다름(bad_response)
  */
 export function readSessionInfo({ status, body }: HttpResult): SessionInfo | null {

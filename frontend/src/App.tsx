@@ -58,7 +58,9 @@ export function App() {
     panelRef,
     triggerRef,
   } = useDrawer();
-  const { draft, setDraft, fillIfEmpty } = useDraft(chat.currentId ?? NEW_CHAT_DRAFT_KEY);
+  const { draft, setDraft, replaceDraft, canUndoReplace, undoReplace } = useDraft(
+    chat.currentId ?? NEW_CHAT_DRAFT_KEY,
+  );
   const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(DEFAULT_RETRIEVAL_MODE);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,14 +71,20 @@ export function App() {
   const isBusyHere = chat.isBusy && chat.activeId === chat.currentId;
   const isBusyElsewhere = chat.isBusy && !isBusyHere;
 
-  // memo 된 대화 화면에 넘기므로 렌더마다 새로 만들지 않는다. 되묻기의 원래 질문 · 예시 질문을 입력창에 채운다
+  // memo 된 대화 화면에 넘기므로 렌더마다 새로 만들지 않는다. 되묻기의 원래 질문 · 예시 질문으로 입력창을 바꾼다
+  // (쓰던 글이 있었으면 입력창 아래 실행 취소로 살린다)
   const handleFillDraft = useCallback(
     (text: string) => {
-      fillIfEmpty(text);
+      replaceDraft(text);
       inputRef.current?.focus();
     },
-    [fillIfEmpty],
+    [replaceDraft],
   );
+
+  function handleUndoReplace(): void {
+    undoReplace();
+    inputRef.current?.focus();
+  }
 
   function handleNewChat(): void {
     chat.newChat();
@@ -123,7 +131,7 @@ export function App() {
 
       {/* 서랍이 열린 동안 Tab 이 서랍 뒤로 빠지지 않게 한다 */}
       <main className="flex min-w-0 flex-1 flex-col" inert={isDrawerOpen}>
-        <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+        <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           {isDrawer ? (
             <button
               ref={triggerRef}
@@ -137,8 +145,9 @@ export function App() {
               ☰
             </button>
           ) : null}
-          {/* 제목과 함께 좁은 화면에서는 숨긴다 (머리줄이 두 줄로 늘어난다) */}
-          <SealMascot className="size-8 shrink-0 max-md:hidden" />
+          {/* 제목과 함께 좁은 화면에서는 숨긴다 (머리줄이 두 줄로 늘어난다). 마우스를 올리면 손을 흔들고 반짝이며 눈을 깜박인다.
+              32px 로 그리면 선이 굵고 흐려 보여 40px 로 그리고, 물개가 숨는 좁은 화면과 머리줄 높이가 같도록 음수 여백을 둔다 */}
+          <SealMascot motion="hover" isSubtle className="-my-1 size-10 shrink-0 max-md:hidden" />
           {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
           <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -159,7 +168,7 @@ export function App() {
           <ChatView
             messages={chat.messages}
             isChecking={chat.isChecking}
-            isExpired={chat.isExpired}
+            isSessionGone={chat.isSessionGone}
             onClarify={handleFillDraft}
             onPickExample={handleFillDraft}
           />
@@ -174,6 +183,7 @@ export function App() {
           inputRef={inputRef}
           placeholder={isAwaitingClarification(chat.messages) ? CLARIFY_PLACEHOLDER : undefined}
           hint={composerHintOf(chat.isChecking, isBusyElsewhere)}
+          onUndoReplace={canUndoReplace ? handleUndoReplace : undefined}
         />
       </main>
     </div>

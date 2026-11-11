@@ -1,11 +1,15 @@
 import { memo } from "react";
 
 import { useNow } from "../hooks/useNow";
+import type { DeletedConversation } from "../hooks/useUndoDelete";
 import { titleOf, type Conversation } from "../lib/chat";
 import { sortByRecent } from "../lib/history";
 
 /** 하루 (ms) */
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 실행 취소 카운트다운을 다시 그리는 간격. 1초보다 짧게 두어 숫자가 늦게 바뀌지 않게 한다 */
+const COUNTDOWN_TICK_MS = 200;
 
 interface HistoryListProps {
   conversations: Conversation[];
@@ -14,6 +18,9 @@ interface HistoryListProps {
   activeId: string | undefined;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
+  /** 방금 지운 대화. 목록에서 원래 있던 자리에 남은 초와 실행 취소 안내를 보여 준다 */
+  lastDeleted: DeletedConversation | undefined;
+  onUndoRemove: () => void;
 }
 
 interface DateGroup {
@@ -69,28 +76,87 @@ function timeLabel(time: number, now: number): string {
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 }
 
+interface DeletedItemProps {
+  title: string;
+  /** 실행 취소를 그만 받는 시각(ms) */
+  deadline: number;
+  onUndo: () => void;
+}
+
+// 지운 대화가 있던 자리의 실행 취소 안내. 왼쪽에 실행 취소를 받는 남은 초를 보여 준다.
+// 남은 초는 0 이 되기 전에 안내가 사라지므로 1 아래로는 보이지 않고, 바뀔 때마다 스크린 리더가 읽지 않게 숨긴다
+function DeletedItem({ title, deadline, onUndo }: DeletedItemProps) {
+  const now = useNow(COUNTDOWN_TICK_MS);
+  const seconds = Math.max(1, Math.ceil((deadline - now) / 1000));
+  return (
+    <li>
+      <div
+        role="status"
+        className="flex items-center gap-2 rounded-lg bg-zinc-200 py-1.5 pr-2 pl-2 text-sm dark:bg-zinc-800"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-5 shrink-0 items-center justify-center rounded-full border border-zinc-400 text-[11px] font-medium text-zinc-600 tabular-nums dark:border-zinc-500 dark:text-zinc-300"
+        >
+          {seconds}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-zinc-500">삭제됨: {title}</span>
+        <button
+          type="button"
+          onClick={onUndo}
+          className="shrink-0 text-xs font-medium underline underline-offset-2"
+        >
+          실행 취소
+        </button>
+      </div>
+    </li>
+  );
+}
+
+// 목록에 방금 지운 대화를 다시 끼운다. 최근 활동순이라 지우기 전에 있던 자리에 들어간다
+function withDeleted(
+  conversations: Conversation[],
+  deleted: Conversation | undefined,
+): Conversation[] {
+  const isListed = deleted !== undefined && conversations.some((c) => c.id === deleted.id);
+  return deleted === undefined || isListed ? conversations : [...conversations, deleted];
+}
+
 function HistoryListView({
   conversations,
   currentId,
   activeId,
   onSelect,
   onRemove,
+  lastDeleted,
+  onUndoRemove,
 }: HistoryListProps) {
   const now = useNow();
-  if (conversations.length === 0) {
+  const listed = withDeleted(conversations, lastDeleted?.conversation);
+  if (listed.length === 0) {
     return <p className="px-1 text-xs text-zinc-500">아직 대화가 없습니다.</p>;
   }
 
   return (
     <div className="space-y-4">
-      {groupByDate(sortByRecent(conversations), now).map(({ label, items }) => (
+      {groupByDate(sortByRecent(listed), now).map(({ label, items }) => (
         <section key={label} aria-label={label}>
           <h3 className="px-1 pb-1 text-[11px] font-medium text-zinc-500">{label}</h3>
           <ul className="space-y-0.5">
             {items.map((c) => {
+              const title = titleOf(c);
+              if (c === lastDeleted?.conversation) {
+                return (
+                  <DeletedItem
+                    key={c.id}
+                    title={title}
+                    deadline={lastDeleted.deadline}
+                    onUndo={onUndoRemove}
+                  />
+                );
+              }
               const isSelected = c.id === currentId;
               const isActive = c.id === activeId;
-              const title = titleOf(c);
               return (
                 <li key={c.id} className="group relative">
                   <button
@@ -134,7 +200,7 @@ function HistoryListView({
 }
 
 /**
- * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다.
+ * 대화 목록: 최신순, 오늘 · 어제 · 지난 7일 · 이전으로 묶는다. 방금 지운 대화는 그 자리에 남은 초와 실행 취소 안내로 남긴다.
  * 대화가 수백 개일 수 있어 memo 로 감싼다 (입력창에 칠 때마다 다시 그리지 않게). 넘기는 핸들러는 고정해서 넘긴다
  */
 export const HistoryList = memo(HistoryListView);
