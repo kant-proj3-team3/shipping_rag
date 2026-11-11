@@ -173,18 +173,24 @@ export function sortByRecent(conversations: Conversation[]): Conversation[] {
  * - 양쪽에 다 있는 대화는 더 최근에 바뀐 쪽을 쓴다. 같으면 이 탭 것을 쓴다 (받는 중인 답변이 저장본에는 중지로 읽힌다)
  * - 저장본에 없는 대화는 다른 탭이 지운 것으로 보고 뺀다. 이 탭에서 답변을 받는 중인 대화는 남긴다
  * - 보고 있던 대화가 빠지면 새 대화 화면으로 돌린다
+ *
+ * @param isUnsaved 이 탭이 마지막 저장에 실패했다. 저장본에 없는 대화가 이 탭에서만 있는(저장하지 못한) 대화일 수 있어 빼지 않는다
  */
-export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]): LoadedHistory {
+export function mergeFromOtherTab(
+  local: LoadedHistory,
+  stored: Conversation[],
+  isUnsaved = false,
+): LoadedHistory {
   const localById = new Map(local.conversations.map((c) => [c.id, c]));
   const storedIds = new Set(stored.map((c) => c.id));
   const merged = stored.map((theirs) => {
     const mine = localById.get(theirs.id);
     return mine !== undefined && mine.updatedAt >= theirs.updatedAt ? mine : theirs;
   });
-  const receiving = local.conversations.filter(
-    (c) => !storedIds.has(c.id) && hasPendingAnswer(c.messages),
+  const kept = local.conversations.filter(
+    (c) => !storedIds.has(c.id) && (isUnsaved || hasPendingAnswer(c.messages)),
   );
-  const conversations = sortByRecent([...receiving, ...merged]);
+  const conversations = sortByRecent([...kept, ...merged]);
   // 목록에 없던 보고 있던 대화(서버 기록으로 채우는 중)는 건드리지 않는다
   const isCurrentListed = localById.has(local.currentId ?? "");
   const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);

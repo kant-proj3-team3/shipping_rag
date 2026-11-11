@@ -63,7 +63,9 @@ export function useChatHistory(): UseChatHistoryResult {
   // 다른 탭이 목록을 저장하면 합친다. 합치지 않으면 이 탭이 다음에 저장할 때 다른 탭의 대화를 덮어써 지운다
   const mergeOtherTab = useCallback(() => {
     const { conversations } = loadHistory(storage);
-    updateHistory((h) => mergeFromOtherTab(h, conversations));
+    // 저장에 실패한 동안에는 저장본에 없는 대화가 이 탭에서만 있는 대화일 수 있어 지운 것으로 보지 않는다
+    const isUnsaved = lastSaveRef.current === "failed";
+    updateHistory((h) => mergeFromOtherTab(h, conversations, isUnsaved));
   }, [storage, updateHistory]);
   useStorageChange(HISTORY_STORAGE_KEY, mergeOtherTab);
 
