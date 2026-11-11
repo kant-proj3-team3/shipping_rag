@@ -5,7 +5,7 @@ import { useApi } from "./useApi";
 import { useChatHistory } from "./useChatHistory";
 import { useSessionLookup } from "./useSessionLookup";
 import { useStorage } from "./useStorage";
-import { useUndoDelete } from "./useUndoDelete";
+import { useUndoDelete, type DeletedConversation } from "./useUndoDelete";
 import { RequestError } from "../api/client";
 import type { QueryRequest, RetrievalMode } from "../api/types";
 import {
@@ -51,7 +51,7 @@ export interface UseChatResult {
   /** 마지막 저장 결과 */
   saveResult: SaveResult;
   /** 방금 지워서 실행 취소할 수 있는 대화 */
-  lastDeleted: Conversation | undefined;
+  lastDeleted: DeletedConversation | undefined;
   /** 보고 있는 대화에 질문을 보낸다. 받는 중 · 확인 중이거나 빈 질문이면 보내지 않고 false */
   send: (question: string, retrievalMode: RetrievalMode) => boolean;
   /** 받는 중인 답변을 멈춘다 */
