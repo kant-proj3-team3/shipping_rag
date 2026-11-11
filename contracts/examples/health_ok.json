@@ -1,0 +1,7 @@
+{
+  "status": "ok",
+  "index_ready": true,
+  "index_name": "demo-index",
+  "embedder_id": "demo-embedder",
+  "supported_modes": ["naive", "hybrid", "hybrid_rerank"]
+}

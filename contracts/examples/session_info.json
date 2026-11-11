@@ -1,0 +1,31 @@
+{
+  "session_id": "demo-session-0001",
+  "created_at": "2026-11-06T09:00:00Z",
+  "last_active_at": "2026-11-06T09:02:10Z",
+  "expires_at": null,
+  "turn_count": 2,
+  "turns": [
+    {
+      "request_id": "demo-002",
+      "asked_at": "2026-11-06T09:00:05Z",
+      "question": "장비 A의 자동 화면 꺼짐 시간은 몇 분인가요?",
+      "retrieval_mode": "naive",
+      "status": "needs_clarification",
+      "answer": "장비 모델과 확인하려는 기준일을 알려 주세요.",
+      "citations": [
+        {"source_id": "S1", "book_id": "DEMO_MANUAL", "file_name": "DEMO_MANUAL.pdf", "page": 3}
+      ]
+    },
+    {
+      "request_id": "demo-001",
+      "asked_at": "2026-11-06T09:02:10Z",
+      "question": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 몇 분인가요?",
+      "retrieval_mode": "hybrid",
+      "status": "answered",
+      "answer": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 15분입니다.",
+      "citations": [
+        {"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}
+      ]
+    }
+  ]
+}

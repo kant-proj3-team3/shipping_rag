@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+**/__pycache__
+**/.pytest_cache
+.env
+data/
+qdrant_storage/
+frontend/
+contracts/
+scripts/
+*.zip
+.mock_index/

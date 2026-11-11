@@ -1,0 +1,12 @@
+{
+  "request_id": "demo-003",
+  "status": "abstained",
+  "answer": "현장 확인 메모는 15분, 장비 설정 기록은 20분으로 다릅니다. 적용할 값을 정할 근거가 없어 답변을 보류합니다. 해당 장비의 확정된 설정이나 정정 기록이 필요합니다.",
+  "reason": "같은 대상과 날짜의 값이 다르고 우선 적용할 근거가 없습니다.",
+  "citations": [
+    {"source_id": "S1", "book_id": "DEMO_MEMO", "file_name": "DEMO_MEMO.pdf", "page": 2},
+    {"source_id": "S2", "book_id": "DEMO_SETTING", "file_name": "DEMO_SETTING.pdf", "page": 4}
+  ],
+  "error_code": null,
+  "meta": {"retrieval_mode": "hybrid_rerank", "latency_ms": 2210.0, "input_tokens": 700, "output_tokens": 96, "cache_hit": true, "trace_id": null}
+}

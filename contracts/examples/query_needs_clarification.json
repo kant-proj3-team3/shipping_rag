@@ -1,0 +1,12 @@
+{
+  "request_id": "demo-002",
+  "status": "needs_clarification",
+  "answer": "장비 모델과 확인하려는 기준일을 알려 주세요.",
+  "reason": "모델과 적용일에 따라 값이 달라집니다.",
+  "citations": [
+    {"source_id": "S1", "book_id": "DEMO_MANUAL", "file_name": "DEMO_MANUAL.pdf", "page": 3},
+    {"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}
+  ],
+  "error_code": null,
+  "meta": {"retrieval_mode": "naive", "latency_ms": 1500.0, "input_tokens": 540, "output_tokens": 40, "cache_hit": false, "trace_id": null}
+}

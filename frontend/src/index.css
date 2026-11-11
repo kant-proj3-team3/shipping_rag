@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+/* 다크 모드는 <html class="dark"> 로 바꾼다 (시스템 · 라이트 · 다크 선택, useTheme). 처음 그리기 전에는 index.html 스크립트가 붙인다 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 물개 그림의 움직임 (components/seal). 주기를 1.2s 와 그 배수 · 절반으로 맞추고 시작 시점만 어긋나게 둔다 */
+  --animate-seal-bob: seal-bob 1.2s ease-in-out infinite;
+  --animate-seal-pump: seal-pump 1.2s ease-in-out infinite;
+  --animate-seal-pump-late: seal-pump 1.2s ease-in-out -0.6s infinite;
+  --animate-seal-wag: seal-wag 1.2s ease-in-out infinite;
+  --animate-seal-spark: seal-spark 1.2s ease-in-out infinite;
+  --animate-seal-spark-2: seal-spark 1.2s ease-in-out 0.15s infinite;
+  --animate-seal-spark-3: seal-spark 1.2s ease-in-out 0.3s infinite;
+  --animate-seal-blink: seal-blink 3.6s linear infinite;
+  --animate-seal-hug: seal-hug 1.2s ease-in-out infinite;
+  --animate-seal-glint: seal-glint 2.4s ease-in-out infinite;
+  --animate-seal-write: seal-write 0.6s ease-in-out infinite;
+  --animate-seal-twinkle: seal-twinkle 2.4s ease-in-out infinite;
+  --animate-seal-twinkle-late: seal-twinkle 2.4s ease-in-out -1.2s infinite;
+  --animate-seal-hop: seal-hop 1.2s ease-in-out infinite;
+  --animate-seal-shake: seal-shake 0.6s ease-in-out infinite;
+  --animate-seal-shake-late: seal-shake 0.6s ease-in-out -0.3s infinite;
+  --animate-seal-float: seal-float 2.4s ease-in-out infinite;
+  --animate-seal-float-late: seal-float 2.4s ease-in-out -1.2s infinite;
+  --animate-seal-pop: seal-pop 1.2s ease-in-out infinite;
+
+  /* 팀 로고의 움직임 (TeamLogo). 마우스를 올린 동안 물이 흘러가고 깃발이 펄럭인다 */
+  --animate-logo-wave: logo-wave 1.2s linear infinite;
+  --animate-logo-flag: logo-flag 0.6s ease-in-out infinite;
+
+  /* 물결 한 번 길이(6)만큼 왼쪽으로 옮겼다가 처음으로 돌아온다. 모양이 같아 이어 흐르는 것처럼 보인다 */
+  @keyframes logo-wave {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-6px);
+    }
+  }
+
+  /* 돛대에 매인 쪽을 축으로 깃발 끝이 위아래로 흔들린다 */
+  @keyframes logo-flag {
+    0%,
+    100% {
+      transform: skewY(0deg) scaleX(1);
+    }
+    25% {
+      transform: skewY(-12deg) scaleX(0.9);
+    }
+    75% {
+      transform: skewY(10deg) scaleX(0.95);
+    }
+  }
+
+  @keyframes seal-bob {
+    0%,
+    100% {
+      transform: translateY(0) scale(1, 1);
+    }
+    50% {
+      transform: translateY(1.5px) scale(1.015, 0.975);
+    }
+  }
+
+  @keyframes seal-pump {
+    0%,
+    100% {
+      transform: translateY(2px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-6px) rotate(-5deg);
+    }
+  }
+
+  @keyframes seal-wag {
+    0%,
+    100% {
+      transform: rotate(-2deg);
+    }
+    50% {
+      transform: rotate(4deg);
+    }
+  }
+
+  @keyframes seal-spark {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.75);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes seal-blink {
+    0%,
+    92%,
+    100% {
+      transform: scaleY(1);
+    }
+    96% {
+      transform: scaleY(0.08);
+    }
+  }
+
+  /* 안은 것을 살짝 들어 올린다 (SealCoin) */
+  @keyframes seal-hug {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-2.5px);
+    }
+  }
+
+  /* 금화 위 반짝임이 잠깐 나타났다 사라진다 (SealCoin) */
+  @keyframes seal-glint {
+    0%,
+    55%,
+    100% {
+      opacity: 0;
+      transform: scale(0.2) rotate(0deg);
+    }
+    75% {
+      opacity: 1;
+      transform: scale(1.1) rotate(45deg);
+    }
+  }
+
+  /* 연필로 끄적인다 (SealStudy) */
+  @keyframes seal-write {
+    0%,
+    100% {
+      transform: rotate(-4deg);
+    }
+    50% {
+      transform: rotate(6deg);
+    }
+  }
+
+  /* 별이 커졌다 작아지며 돈다 (SealStudy) */
+  @keyframes seal-twinkle {
+    0%,
+    100% {
+      opacity: 0.5;
+      transform: scale(0.65) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1) rotate(20deg);
+    }
+  }
+
+  /* 응원하며 들썩인다 (SealCheer) */
+  @keyframes seal-hop {
+    0%,
+    100% {
+      transform: translateY(0) scale(1, 1);
+    }
+    40% {
+      transform: translateY(-4px) scale(0.98, 1.02);
+    }
+    70% {
+      transform: translateY(0) scale(1.02, 0.98);
+    }
+  }
+
+  /* 응원 술을 흔든다 (SealCheer) */
+  @keyframes seal-shake {
+    0%,
+    100% {
+      transform: rotate(-12deg);
+    }
+    50% {
+      transform: translateY(-2px) rotate(12deg);
+    }
+  }
+
+  /* 하트가 떠올랐다 내려온다 (SealCheer) */
+  @keyframes seal-float {
+    0%,
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    50% {
+      opacity: 0.6;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* 글자가 통통 튄다 (SealCheer) */
+  @keyframes seal-pop {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.08);
+    }
+  }
+}
+
+/* 잔잔한 움직임(useSealSvg 의 isSubtle)에서 반짝임이 크기 변화 없이 밝기만 바뀐다.
+   animate-* 유틸리티가 아니라 keyframes 이름으로만 쓰므로 @theme 밖에 둔다 (@theme 의 keyframes 는 animate-* 가 쓰일 때만 나온다) */
+@keyframes seal-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-white text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+}

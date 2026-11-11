@@ -1,0 +1,9 @@
+{
+  "request_id": "demo-error-001",
+  "status": "error",
+  "answer": "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "reason": "model_timeout",
+  "citations": [],
+  "error_code": "model_timeout",
+  "meta": {"retrieval_mode": "hybrid", "latency_ms": 30000.0, "input_tokens": null, "output_tokens": null, "cache_hit": false, "trace_id": null}
+}

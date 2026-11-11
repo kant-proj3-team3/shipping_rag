@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAG Q&A 인터페이스 계약 뷰어</title>
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+  --bg: #f7f6f2; --surface: #ffffff; --surface-2: #f1f0ea;
+  --text: #1c1b19; --muted: #6a685f; --border: #e2e0d8; --border-strong: #b9b6a9;
+  --accent: #5a49b8; --accent-bg: #ece9fa; --accent-text: #3f3190;
+  --code-bg: #f1f0ea; --ok: #1f7a4d; --warn: #a15c07; --err: #b3372f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #15151a; --surface: #1e1e25; --surface-2: #26262f;
+    --text: #ececf1; --muted: #9b9aa8; --border: #33333f; --border-strong: #55556a;
+    --accent: #a79bf2; --accent-bg: #2b2750; --accent-text: #cfc8ff;
+    --code-bg: #26262f; --ok: #5fcf9a; --warn: #e8b05a; --err: #f08a82;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15151a; --surface: #1e1e25; --surface-2: #26262f;
+  --text: #ececf1; --muted: #9b9aa8; --border: #33333f; --border-strong: #55556a;
+  --accent: #a79bf2; --accent-bg: #2b2750; --accent-text: #cfc8ff;
+  --code-bg: #26262f; --ok: #5fcf9a; --warn: #e8b05a; --err: #f08a82;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.6 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 22px; margin: 4px 0 2px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); font-weight: 600; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; margin: 6px 0; overflow-x: auto; white-space: pre; }
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+.tab {
+  appearance: none; border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600;
+  padding: 9px 14px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tab[aria-selected="true"] { color: var(--accent-text); border-bottom-color: var(--accent); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+.card.sel { border-color: var(--accent); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+ul.rules { margin: 6px 0 0; padding-left: 18px; }
+ul.rules li { margin: 3px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.tlink {
+  appearance: none; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--accent-text);
+  font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px;
+  padding: 1px 7px; border-radius: 999px; cursor: pointer; margin: 0 1px;
+}
+.tlink.if { background: var(--accent-bg); border-color: var(--accent); }
+.tlink:hover { border-color: var(--accent); }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--accent-bg); color: var(--accent-text); margin-left: 6px; vertical-align: middle; }
+.req { color: var(--err); font-weight: 700; }
+.opt { color: var(--muted); }
+.muted { color: var(--muted); }
+.map { width: 100%; height: auto; display: block; }
+.map .node rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; }
+.map .node.module rect { fill: var(--accent-bg); stroke: var(--accent); }
+.map .node.sel rect { stroke-width: 3; }
+.map .node text, .map .flow text, .map .note { fill: var(--text); font-size: 13px; }
+.map .small { font-size: 11px; fill: var(--muted) !important; }
+.map .clickable { cursor: pointer; }
+.map .line { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.map .dash { stroke-dasharray: 5 4; stroke: var(--accent); stroke-width: 1.6; }
+.map .flow.sel text { font-weight: 700; fill: var(--accent-text); }
+.map .flow .hit { fill: transparent; }
+.split { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+.side { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px; max-height: 70vh; overflow-y: auto; }
+.side h4 { margin: 10px 8px 4px; font-size: 12px; color: var(--muted); }
+.side button {
+  display: block; width: 100%; text-align: left; appearance: none; border: 0; background: none; color: var(--text);
+  font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; padding: 5px 8px; border-radius: 6px; cursor: pointer;
+}
+.side button[aria-current="true"] { background: var(--accent-bg); color: var(--accent-text); font-weight: 700; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.btn {
+  appearance: none; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; cursor: pointer;
+}
+.btn[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
+.status-answered { color: var(--ok); } .status-needs_clarification { color: var(--warn); }
+.status-abstained { color: var(--warn); } .status-error { color: var(--err); }
+.foot { margin-top: 28px; font-size: 12px; color: var(--muted); }
+@media (max-width: 720px) { .split { grid-template-columns: 1fr; } .side { max-height: 220px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>RAG Q&amp;A 인터페이스 계약</h1>
+  <p class="sub">packages/common 코드에서 자동 추출한 읽기 전용 뷰어입니다. 코드가 원본이며, 계약이 바뀌면 이 페이지를 다시 생성합니다.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="map" aria-selected="true">모듈 지도</button>
+    <button class="tab" role="tab" data-tab="types" aria-selected="false">타입 사전</button>
+    <button class="tab" role="tab" data-tab="http" aria-selected="false">HTTP · 예시</button>
+  </div>
+
+  <section id="tab-map">
+    <div class="card">
+      <svg class="map" viewBox="0 0 680 330" role="img" aria-label="모듈과 데이터 흐름 지도. 모듈이나 화살표 이름을 눌러 계약을 확인합니다.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <g class="node"><rect x="30" y="14" width="480" height="36" rx="8"/><text x="270" y="37" text-anchor="middle">app/ 조립 · 모듈 구현을 아는 유일한 곳</text></g>
+        <path class="line" d="M80 50V96M250 50V96M420 50V96" marker-end="url(#ah)"/>
+        <g class="node module clickable" data-kind="module" data-id="chunking"><rect x="30" y="96" width="100" height="64" rx="10"/><text x="80" y="124" text-anchor="middle">청킹</text><text class="small" x="80" y="144" text-anchor="middle">Embedder · Indexer</text></g>
+        <g class="node module clickable" data-kind="module" data-id="retrieval"><rect x="200" y="96" width="100" height="64" rx="10"/><text x="250" y="124" text-anchor="middle">검색</text><text class="small" x="250" y="144" text-anchor="middle">Retriever</text></g>
+        <g class="node module clickable" data-kind="module" data-id="backend"><rect x="370" y="96" width="100" height="64" rx="10"/><text x="420" y="124" text-anchor="middle">백엔드</text><text class="small" x="420" y="144" text-anchor="middle">QAService</text></g>
+        <g class="node module clickable" data-kind="module" data-id="frontend"><rect x="540" y="96" width="100" height="64" rx="10"/><text x="590" y="124" text-anchor="middle">프론트엔드</text><text class="small" x="590" y="144" text-anchor="middle">React</text></g>
+        <g class="flow clickable" data-kind="flow" data-id="flow-index"><rect class="hit" x="132" y="100" width="66" height="50"/><path class="line dash" d="M132 134H196" marker-end="url(#ah)"/><text x="165" y="124" text-anchor="middle">인덱스</text></g>
+        <g class="flow clickable" data-kind="flow" data-id="flow-retrieve"><rect class="hit" x="302" y="100" width="66" height="50"/><path class="line dash" d="M302 134H366" marker-end="url(#ah)"/><text x="335" y="124" text-anchor="middle">Retriever</text></g>
+        <g class="flow clickable" data-kind="flow" data-id="flow-http"><rect class="hit" x="472" y="100" width="66" height="50"/><path class="line dash" d="M472 134H536" marker-end="url(#ah)"/><text x="505" y="124" text-anchor="middle">HTTP</text></g>
+        <path class="line" d="M80 160V236M250 160V236M420 160V236" marker-end="url(#ah)"/>
+        <path class="line" d="M590 160V236" marker-end="url(#ah)"/>
+        <g class="node"><rect x="30" y="238" width="480" height="40" rx="8"/><text x="270" y="262" text-anchor="middle">common · 인터페이스 · 타입 · 오류 · API 상수</text></g>
+        <g class="node"><rect x="540" y="238" width="100" height="40" rx="8"/><text x="590" y="262" text-anchor="middle">openapi.json</text></g>
+        <text class="note small" x="30" y="312" style="fill:var(--muted)">점선: 런타임 데이터 흐름 (직접 import 아님) · 실선: 의존 · 모듈끼리는 서로 import하지 않습니다</text>
+      </svg>
+      <p class="sub" style="margin:6px 0 0">모듈 상자나 점선 화살표를 눌러보세요.</p>
+    </div>
+    <div id="detail"></div>
+  </section>
+
+  <section id="tab-types" hidden>
+    <div class="split">
+      <nav class="side" id="type-list" aria-label="타입 목록"></nav>
+      <div id="type-detail"></div>
+    </div>
+  </section>
+
+  <section id="tab-http" hidden>
+    <div id="http-body"></div>
+  </section>
+
+  <p class="foot">생성: scripts/build_contract_viewer.py · 원본: packages/common/src/common/{types,interfaces,api}.py</p>
+</div>
+
+<script id="data" type="application/json">{"types": {"RetrievalMode": {"kind": "enum", "doc": "세 가지 필수 RAG 검색 방식.", "values": [{"name": "NAIVE", "value": "naive"}, {"name": "HYBRID", "value": "hybrid"}, {"name": "HYBRID_RERANK", "value": "hybrid_rerank"}]}, "AnswerStatus": {"kind": "enum", "doc": "", "values": [{"name": "ANSWERED", "value": "answered"}, {"name": "NEEDS_CLARIFICATION", "value": "needs_clarification"}, {"name": "ABSTAINED", "value": "abstained"}, {"name": "ERROR", "value": "error"}]}, "ErrorCode": {"kind": "enum", "doc": "status=error 일 때만 쓰는 오류 분류. 근거 부족(abstained)과 섞지 않는다.", "values": [{"name": "INDEX_NOT_READY", "value": "index_not_ready"}, {"name": "RETRIEVAL_FAILED", "value": "retrieval_failed"}, {"name": "MODEL_TIMEOUT", "value": "model_timeout"}, {"name": "MODEL_FAILED", "value": "model_failed"}, {"name": "OUTPUT_INVALID", "value": "output_invalid"}, {"name": "INGEST_FAILED", "value": "ingest_failed"}, {"name": "INVALID_INPUT", "value": "invalid_input"}, {"name": "SESSION_NOT_FOUND", "value": "session_not_found"}, {"name": "INTERNAL", "value": "internal"}]}, "Split": {"kind": "enum", "doc": "제공 평가 파일과 대응: development.json / additional.json / security_tasks.json.\nexpansion_validation 은 Basic 난이도에만 있다. 질문만 담은 *_questions.json 은 split 이 아니다.", "values": [{"name": "DEVELOPMENT", "value": "development"}, {"name": "ADDITIONAL", "value": "additional"}, {"name": "EXPANSION_VALIDATION", "value": "expansion_validation"}, {"name": "SECURITY", "value": "security"}]}, "ExpectedAction": {"kind": "enum", "doc": "평가 파일의 expected_action. API 상태와 이름만 다르다 (answer→answered 등).", "values": [{"name": "ANSWER", "value": "answer"}, {"name": "CLARIFY", "value": "clarify"}, {"name": "ABSTAIN", "value": "abstain"}]}, "EvidenceUnit": {"kind": "enum", "doc": "검색 평가에서 근거 일치를 판단하는 단위.", "values": [{"name": "DOCUMENT", "value": "document"}, {"name": "PAGE", "value": "page"}]}, "ScoreState": {"kind": "enum", "doc": "", "values": [{"name": "SCORED", "value": "scored"}, {"name": "NOT_APPLICABLE", "value": "not_applicable"}, {"name": "UNAVAILABLE", "value": "unavailable"}]}, "RequestContext": {"kind": "model", "doc": "요청 하나를 가로지르는 식별자. 서버가 만들고 모든 호출에 전달한다.", "fields": [{"name": "request_id", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "trace_id", "type": "str | None", "required": false, "default": "None", "constraints": []}], "invariants": []}, "Chunk": {"kind": "model", "doc": "검색 단위. Qdrant payload는 이 스키마를 따른다.", "fields": [{"name": "chunk_id", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "book_id", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "file_name", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "title", "type": "str | None", "required": false, "default": "None", "constraints": []}, {"name": "page_start", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "page_end", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "text", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "metadata", "type": "dict[str, JsonValue]", "required": false, "default": "{}", "constraints": []}], "invariants": ["page_end ≥ page_start"]}, "IngestFailure": {"kind": "model", "doc": "", "fields": [{"name": "book_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "stage", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "reason", "type": "str", "required": true, "default": null, "constraints": []}], "invariants": []}, "IndexProgress": {"kind": "model", "doc": "장시간 인덱싱의 진행 상황. 콜백으로 전달한다.", "fields": [{"name": "stage", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "done", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}, {"name": "total", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}], "invariants": []}, "IndexBuildRequest": {"kind": "model", "doc": "", "fields": [{"name": "documents_dir", "type": "Path", "required": true, "default": null, "constraints": []}, {"name": "index_name", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "rebuild", "type": "bool", "required": false, "default": "False", "constraints": []}, {"name": "params", "type": "dict[str, JsonValue]", "required": false, "default": "{}", "constraints": []}], "invariants": []}, "IndexManifest": {"kind": "model", "doc": "인덱스 하나의 신원 증명. 청킹이 쓰고 검색·백엔드가 읽는다.", "fields": [{"name": "index_name", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "embedder_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "embedding_dim", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "document_count", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}, {"name": "chunk_count", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}, {"name": "fingerprint", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "max_chunk_tokens", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "created_at", "type": "datetime", "required": true, "default": null, "constraints": []}, {"name": "params", "type": "dict[str, JsonValue]", "required": false, "default": "{}", "constraints": []}, {"name": "failures", "type": "list[IngestFailure]", "required": false, "default": "[]", "constraints": []}], "invariants": ["fingerprint는 순서 있는 (chunk_id, text) 해시", "모든 청크는 max_chunk_tokens 이하 (임베더 토큰화 기준, 접두사 포함)"]}, "EvidenceRef": {"kind": "model", "doc": "정답 근거 한 곳. quote 는 PDF 해당 페이지에 실제로 있는 원문이다.", "fields": [{"name": "book_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "page", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "quote", "type": "str | None", "required": false, "default": "None", "constraints": []}], "invariants": []}, "GradingSpec": {"kind": "model", "doc": "답변 채점용 정보. 서비스 생성 입력으로 넘기지 않는다.", "fields": [{"name": "required_facts", "type": "list[str]", "required": false, "default": "[]", "constraints": []}, {"name": "forbidden_claims", "type": "list[str]", "required": false, "default": "[]", "constraints": []}, {"name": "conditions", "type": "list[str]", "required": false, "default": "[]", "constraints": []}, {"name": "grading_notes", "type": "str | None", "required": false, "default": "None", "constraints": []}], "invariants": []}, "SecurityInfo": {"kind": "model", "doc": "보안 문항 전용. 공격 문구는 이미 코퍼스 문서(external_source_id)에 들어 있다.", "fields": [{"name": "attack_type", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "external_source_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "source_page", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "attack_text", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "bad_claims", "type": "list[str]", "required": false, "default": "[]", "constraints": []}], "invariants": []}, "GoldenItem": {"kind": "model", "doc": "평가 질문 한 건. 서비스에는 question 만 전달하고 나머지는 평가기·러너만 쓴다.", "fields": [{"name": "id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "split", "type": "Split", "required": true, "default": null, "constraints": []}, {"name": "question", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "expected_action", "type": "ExpectedAction", "required": true, "default": null, "constraints": []}, {"name": "reference_answer", "type": "str | None", "required": false, "default": "None", "constraints": []}, {"name": "evidence_groups", "type": "list[list[EvidenceRef]]", "required": false, "default": "[]", "constraints": []}, {"name": "grading", "type": "GradingSpec", "required": false, "default": "GradingSpec(required_facts=[], forbidden_claims=[], conditions=[], grading_notes=None)", "constraints": []}, {"name": "security", "type": "SecurityInfo | None", "required": false, "default": "None", "constraints": []}], "invariants": ["evidence_groups: 그룹끼리는 모두 필요(AND), 한 그룹 안의 후보는 하나만 맞으면 됨(OR). 빈 그룹 금지", "security 정보는 split=security 문항만, 그리고 반드시 가진다"]}, "RetrievalRequest": {"kind": "model", "doc": "", "fields": [{"name": "query", "type": "str", "required": true, "default": null, "constraints": ["최소 길이 1"]}, {"name": "mode", "type": "RetrievalMode", "required": true, "default": null, "constraints": []}, {"name": "k", "type": "int", "required": true, "default": null, "constraints": ["≥ 1", "≤ 50"]}], "invariants": []}, "RetrievedChunk": {"kind": "model", "doc": "", "fields": [{"name": "rank", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}, {"name": "score", "type": "float", "required": true, "default": null, "constraints": []}, {"name": "chunk", "type": "Chunk", "required": true, "default": null, "constraints": []}], "invariants": []}, "RetrievalResult": {"kind": "model", "doc": "", "fields": [{"name": "mode", "type": "RetrievalMode", "required": true, "default": null, "constraints": []}, {"name": "k", "type": "int", "required": true, "default": null, "constraints": []}, {"name": "chunks", "type": "list[RetrievedChunk]", "required": true, "default": null, "constraints": []}, {"name": "latency_ms", "type": "float | None", "required": false, "default": "None", "constraints": []}], "invariants": []}, "Score": {"kind": "model", "doc": "", "fields": [{"name": "value", "type": "float | None", "required": false, "default": "None", "constraints": []}, {"name": "state", "type": "ScoreState", "required": true, "default": null, "constraints": []}, {"name": "reason", "type": "str | None", "required": false, "default": "None", "constraints": []}], "invariants": ["state=scored 일 때만 value를 가진다 (미확인 값을 0으로 채우지 않는다)"]}, "RetrievalItemMetrics": {"kind": "model", "doc": "", "fields": [{"name": "item_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "hit", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "recall", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "groups_total", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}, {"name": "satisfied_groups", "type": "list[int]", "required": false, "default": "[]", "constraints": []}], "invariants": []}, "RetrievalReport": {"kind": "model", "doc": "", "fields": [{"name": "mode", "type": "RetrievalMode", "required": true, "default": null, "constraints": []}, {"name": "k", "type": "int", "required": true, "default": null, "constraints": []}, {"name": "unit", "type": "EvidenceUnit", "required": true, "default": null, "constraints": []}, {"name": "index_name", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "index_fingerprint", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "golden_fingerprint", "type": "str | None", "required": false, "default": "None", "constraints": []}, {"name": "items", "type": "list[RetrievalItemMetrics]", "required": true, "default": null, "constraints": []}, {"name": "hit_at_k_mean", "type": "float | None", "required": true, "default": null, "constraints": []}, {"name": "recall_at_k_mean", "type": "float | None", "required": true, "default": null, "constraints": []}, {"name": "scored", "type": "int", "required": true, "default": null, "constraints": []}, {"name": "not_applicable", "type": "int", "required": true, "default": null, "constraints": []}, {"name": "unavailable", "type": "int", "required": true, "default": null, "constraints": []}], "invariants": []}, "QueryRequest": {"kind": "model", "doc": "", "fields": [{"name": "question", "type": "str", "required": true, "default": null, "constraints": ["최대 길이 500"]}, {"name": "retrieval_mode", "type": "RetrievalMode | None", "required": false, "default": "None", "constraints": []}, {"name": "session_id", "type": "str | None", "required": false, "default": "None", "constraints": ["패턴 ^[A-Za-z0-9_-]{8,128}$"]}], "invariants": ["공백만 있는 질문은 거부", "session_id는 영문·숫자·_·- 8~128자 (Redis 키로 쓰이므로)"]}, "Citation": {"kind": "model", "doc": "", "fields": [{"name": "source_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "book_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "file_name", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "page", "type": "int", "required": true, "default": null, "constraints": ["≥ 1"]}], "invariants": []}, "QueryMeta": {"kind": "model", "doc": "", "fields": [{"name": "retrieval_mode", "type": "RetrievalMode", "required": true, "default": null, "constraints": []}, {"name": "latency_ms", "type": "float | None", "required": false, "default": "None", "constraints": []}, {"name": "input_tokens", "type": "int | None", "required": false, "default": "None", "constraints": []}, {"name": "output_tokens", "type": "int | None", "required": false, "default": "None", "constraints": []}, {"name": "cost_usd", "type": "float | None", "required": false, "default": "None", "constraints": []}, {"name": "cache_hit", "type": "bool", "required": false, "default": "False", "constraints": []}, {"name": "trace_id", "type": "str | None", "required": false, "default": "None", "constraints": []}], "invariants": []}, "QueryResponse": {"kind": "model", "doc": "", "fields": [{"name": "request_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "status", "type": "AnswerStatus", "required": true, "default": null, "constraints": []}, {"name": "answer", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "reason", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "citations", "type": "list[Citation]", "required": false, "default": "[]", "constraints": []}, {"name": "error_code", "type": "ErrorCode | None", "required": false, "default": "None", "constraints": []}, {"name": "meta", "type": "QueryMeta", "required": true, "default": null, "constraints": []}], "invariants": ["error_code는 status=error 일 때만, 그리고 반드시 가진다", "status=answered 이면 citations가 1개 이상"]}, "ContextItem": {"kind": "model", "doc": "모델에 실제로 전달한 최종 문맥의 한 조각.", "fields": [{"name": "source_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "chunk", "type": "Chunk", "required": true, "default": null, "constraints": []}], "invariants": []}, "QAResult": {"kind": "model", "doc": "QAService 반환값. API는 response만 내보내고, final_context는 평가용이다.", "fields": [{"name": "response", "type": "QueryResponse", "required": true, "default": null, "constraints": []}, {"name": "final_context", "type": "list[ContextItem]", "required": false, "default": "[]", "constraints": []}], "invariants": []}, "SessionTurn": {"kind": "model", "doc": "세션에 기록된 질의응답 한 번. status=error 응답은 기록하지 않는다.", "fields": [{"name": "request_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "asked_at", "type": "datetime", "required": true, "default": null, "constraints": []}, {"name": "question", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "retrieval_mode", "type": "RetrievalMode", "required": true, "default": null, "constraints": []}, {"name": "status", "type": "AnswerStatus", "required": true, "default": null, "constraints": []}, {"name": "answer", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "citations", "type": "list[Citation]", "required": false, "default": "[]", "constraints": []}], "invariants": []}, "SessionInfo": {"kind": "model", "doc": "GET /session/{session_id} 응답.", "fields": [{"name": "session_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "created_at", "type": "datetime", "required": true, "default": null, "constraints": []}, {"name": "last_active_at", "type": "datetime", "required": true, "default": null, "constraints": []}, {"name": "expires_at", "type": "datetime | None", "required": false, "default": "None", "constraints": []}, {"name": "turn_count", "type": "int", "required": true, "default": null, "constraints": ["≥ 0"]}, {"name": "turns", "type": "list[SessionTurn]", "required": false, "default": "[]", "constraints": []}], "invariants": ["turns 개수는 turn_count를 넘을 수 없다"]}, "ApiError": {"kind": "model", "doc": "QueryResponse가 아닌 오류 응답(현재는 /session 404).", "fields": [{"name": "error_code", "type": "ErrorCode", "required": true, "default": null, "constraints": []}, {"name": "message", "type": "str", "required": true, "default": null, "constraints": []}], "invariants": []}, "HealthResponse": {"kind": "model", "doc": "", "fields": [{"name": "status", "type": "Literal['ok']", "required": false, "default": "'ok'", "constraints": []}, {"name": "index_ready", "type": "bool", "required": true, "default": null, "constraints": []}, {"name": "index_name", "type": "str | None", "required": false, "default": "None", "constraints": []}, {"name": "embedder_id", "type": "str | None", "required": false, "default": "None", "constraints": []}, {"name": "supported_modes", "type": "list[RetrievalMode]", "required": false, "default": "[]", "constraints": []}], "invariants": []}, "AnswerEvalRecord": {"kind": "model", "doc": "", "fields": [{"name": "item", "type": "GoldenItem", "required": true, "default": null, "constraints": []}, {"name": "result", "type": "QAResult", "required": true, "default": null, "constraints": []}], "invariants": []}, "JudgeScores": {"kind": "model", "doc": "LLM-as-a-Judge 네 항목. 각 항목 0/1.", "fields": [{"name": "facts", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "conditions", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "evidence", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "decision", "type": "Score", "required": true, "default": null, "constraints": []}], "invariants": []}, "AnswerEvaluation": {"kind": "model", "doc": "", "fields": [{"name": "item_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "request_id", "type": "str", "required": true, "default": null, "constraints": []}, {"name": "faithfulness", "type": "Score", "required": true, "default": null, "constraints": []}, {"name": "ragas_extra", "type": "dict[str, Score]", "required": false, "default": "{}", "constraints": []}, {"name": "judge", "type": "JudgeScores", "required": true, "default": null, "constraints": []}], "invariants": []}}, "groups": [["열거형", ["RetrievalMode", "AnswerStatus", "ErrorCode", "Split", "ExpectedAction", "EvidenceUnit", "ScoreState"]], ["공통", ["RequestContext", "Score"]], ["청킹", ["Chunk", "IngestFailure", "IndexBuildRequest", "IndexProgress", "IndexManifest", "EvidenceRef", "GradingSpec", "SecurityInfo", "GoldenItem"]], ["검색", ["RetrievalRequest", "RetrievedChunk", "RetrievalResult", "RetrievalItemMetrics", "RetrievalReport"]], ["백엔드 · API", ["QueryRequest", "Citation", "QueryMeta", "QueryResponse", "ContextItem", "QAResult", "HealthResponse", "SessionTurn", "SessionInfo", "ApiError", "AnswerEvalRecord", "JudgeScores", "AnswerEvaluation"]]], "interfaces": {"Embedder": {"summary": "텍스트 → 벡터. 구현은 청킹 모듈이 소유하고 검색·평가 모듈에 주입된다.", "rules": ["embedder_id 는 모델 이름뿐 아니라 접두사·정규화·최대 입력 길이 설정까지 구분한다. 이 중 하나라도 바뀌면 점수 기준이 달라지므로 다른 id 여야 한다.", "인덱싱과 질의는 반드시 같은 embedder_id 를 쓴다. (IndexManifest.embedder_id 와 대조)", "문서용/질의용 전처리 차이(접두사 등)는 구현 내부에서 처리한다.", "반환 벡터 길이는 항상 dimension 이다.", "max_input_tokens 는 접두사를 포함한 입력의 상한이다. count_tokens 도 접두사를 포함해 센다.", "embed_query 는 한도를 넘는 입력을 조용히 자르지 않고 InvalidInputError 를 던진다. embed_passages 는 한도를 넘는 입력을 조용히 자르지 않고 IngestError 를 던진다."], "members": [{"name": "embedder_id", "kind": "property", "async": false, "sig": "embedder_id: str"}, {"name": "dimension", "kind": "property", "async": false, "sig": "dimension: int"}, {"name": "max_input_tokens", "kind": "property", "async": false, "sig": "max_input_tokens: int"}, {"name": "count_tokens", "kind": "method", "async": false, "sig": "count_tokens(text: str) -> int"}, {"name": "embed_passages", "kind": "method", "async": false, "sig": "embed_passages(texts: Sequence[str]) -> list[list[float]]"}, {"name": "embed_query", "kind": "method", "async": false, "sig": "embed_query(text: str) -> list[float]"}]}, "Indexer": {"summary": "PDF 폴더 → 청크 → 벡터 색인.", "rules": ["documents_dir 의 *.pdf 전체를 처리한다. 빠진 문서·실패는 manifest.failures 에 남긴다.", "빈 본문, 중복 book_id, 읽을 수 없는 PDF는 failures 에 기록하고 색인에서 뺀다 (조용히 건너뛰지 않는다).", "book_id 는 파일명에서 .pdf 를 뺀 값, 첫 페이지는 1쪽, 파일명은 바꾸지 않는다.", "chunk_id 는 결정적이다: 같은 문서·같은 내용·같은 청킹 조건이면 항상 같은 값 (다시 색인해도 중복이 생기지 않는다).", "모든 청크는 manifest.max_chunk_tokens 이하이고, 한 청크의 page_start~page_end 는 실제로 걸친 페이지다.", "같은 index_name 이 있으면 rebuild=True 일 때만 덮어쓴다. 아니면 IngestError.", "색인된 payload 는 types.Chunk 스키마를 따른다.", "질문·정답·채점 기준 JSON 은 색인하지 않는다.", "오래 걸리는 작업이므로 progress 콜백에 단계별 진행 상황을 알린다 (선택)."], "members": [{"name": "build", "kind": "method", "async": false, "sig": "build(request: IndexBuildRequest, progress: ProgressCallback | None = None) -> IndexManifest"}, {"name": "get_manifest", "kind": "method", "async": false, "sig": "get_manifest(index_name: str) -> IndexManifest | None"}]}, "GoldenDatasetProvider": {"summary": "제공 평가 파일 → GoldenItem 목록. 평가 파일 필드 매핑은 구현이 책임진다.", "rules": ["정답이 든 파일(development.json · additional.json · security_tasks.json)을 읽는다. 질문만 든 *_questions.json 은 서비스 입력 점검용이며 같은 id·질문이어야 한다.", "splits=None 이면 security 를 제외한 전체를 돌려준다.", "id 는 전체에서 유일하다. evidence_groups 의 book_id·page 는 실제 PDF 범위 안에 있어야 한다.", "반환값은 평가기·러너만 쓴다. 서비스(검색·생성)에는 item.question 만 전달한다.", "fingerprint 는 같은 문항·정답이면 같은 값이다 (순서 있는 id 와 평가 필드의 해시)."], "members": [{"name": "load", "kind": "method", "async": false, "sig": "load(splits: Sequence[Split] | None = None) -> list[GoldenItem]"}, {"name": "fingerprint", "kind": "method", "async": false, "sig": "fingerprint(splits: Sequence[Split] | None = None) -> str"}]}, "Retriever": {"summary": "질의 → 근거 청크. 세 검색 방식은 mode 로만 바꾼다 (서비스를 따로 만들지 않는다).", "rules": ["supported_modes 에 없는 mode 가 오면 ValueError 가 아니라 RetrievalError.", "결과는 len ≤ k, rank 는 1부터 연속 오름차순, chunk_id 중복 없음.", "빈 결과는 정상(예외 아님). 인덱스·임베더 불일치는 IndexNotReadyError.", "질문이 임베더 한도를 넘으면 InvalidInputError 를 그대로 전파한다 (RetrievalError 로 감싸지 않는다).", "점수 임계값은 방식마다 척도가 달라 검색 모듈 내부 설정이다. 요청으로 받지 않는다.", "생성 시점에 인덱스 manifest 의 max_chunk_tokens 를 자신의 모델(리랭커 등) 입력 한도와 대조하고, 안 맞으면 IndexNotReadyError 로 알린다. 조용히 잘라서 쓰지 않는다.", "같은 요청에서 모드 간 임베딩·저장소·k 는 같다. 정답·평가 정보를 참조하지 않는다.", "index 는 생성 시 주입받은 IndexManifest 그대로다. 평가기(보고서의 index_name·index_fingerprint)와 백엔드(캐시 키의 index_name+embedder_id)가 이 값으로 인덱스의 신원을 안다."], "members": [{"name": "supported_modes", "kind": "property", "async": false, "sig": "supported_modes: Sequence[RetrievalMode]"}, {"name": "index", "kind": "property", "async": false, "sig": "index: IndexManifest"}, {"name": "retrieve", "kind": "method", "async": true, "sig": "async retrieve(request: RetrievalRequest, ctx: RequestContext) -> RetrievalResult"}]}, "RetrievalEvaluator": {"summary": "Hit@k / Recall@k. 근거 그룹 단위로 계산한다.", "rules": ["한 문항의 근거는 evidence_groups 다. 그룹끼리는 모두 필요(AND), 그룹 안 후보는 하나만 맞으면 된다(OR). 그룹이 만족되면 satisfied. Hit@k = 만족한 그룹이 하나라도 있으면 1, Recall@k = 만족한 그룹 수 / 전체 그룹 수.", "unit=DOCUMENT 는 book_id 가 같으면 일치, unit=PAGE 는 검색된 청크의 [page_start, page_end] 가 근거 페이지를 포함해야 일치한다. 같은 근거가 여러 청크에서 나와도 한 번만 센다.", "unit 은 호출자가 명시한다 (기본값 없음). 어느 단위로 보고했는지는 report.unit 에 남는다.", "근거 그룹이 없는 문항은 Score(state=not_applicable).", "검색 결과가 비어도 근거가 있는 문항은 제외하지 않고 0점으로 센다.", "호출 실패는 해당 문항을 unavailable 로 두고 평균에서 제외한다.", "k 가 그룹 수보다 작으면 Recall 만점이 불가능하다. 보고서의 k 와 함께 해석한다.", "보고서에 index_name · index_fingerprint(주입받은 retriever.index 의 값) 와 golden_fingerprint 를 남긴다. golden_fingerprint 는 평가기가 골든 제공자를 모르므로 호출자가 GoldenDatasetProvider.fingerprint 값을 넘긴다 (안 넘기면 None)."], "members": [{"name": "evaluate", "kind": "method", "async": true, "sig": "async evaluate(items: Sequence[GoldenItem], mode: RetrievalMode, k: int, unit: EvidenceUnit, golden_fingerprint: str | None = None) -> RetrievalReport"}]}, "QAService": {"summary": "질문 → 검색 → 프롬프트·모델 호출 → 검증 → 출처 매핑 → 응답.", "rules": ["검색은 주입받은 Retriever 로만 한다. 검색 모듈 구현을 직접 import 하지 않는다.", "검색 결과(또는 토큰 예산 적용 후 문맥)가 비면 모델을 호출하지 않고 abstained 로 응답한다.", "모델 출력은 코드로 검증한다: 필수 필드, status 값, source_id ∈ 이번 요청 문맥. 문서명·페이지는 모델이 쓰지 않고 코드가 chunk 정보로 채운다.", "status=error 는 코드만 부여한다 (LLM이 정하지 않는다). 근거 부족은 abstained.", "모든 반환은 QueryResponse 계약을 지킨다. 예외를 호출자에게 던지지 않고 status=error + error_code 로 돌려준다 (프로그래밍 오류 제외). InvalidInputError 는 error_code=invalid_input 으로 매핑한다.", "ctx.request_id 로 질문·검색 문서·실제 모델 입출력·시간·토큰을 Langfuse에 묶어 기록한다. 기록에 성공하면 meta.trace_id 를 반드시 채운다 (점수·피드백을 trace_id 에 붙인다).", "비용(cost_usd)은 모델 사용량으로 계산할 수 있을 때만 채우고, 모르면 None 이다.", "캐시 적중이어도 같은 스키마를 돌려주고 meta.cache_hit=True 로 표시한다.", "final_context 는 모델에 실제 전달한 문맥과 같아야 한다 (평가 입력).", "request.session_id 가 있으면 끝난 질의응답을 세션 turn 으로 기록한다 (SessionService 참고).", "request.session_id 가 있으면 같은 세션의 이전 질의응답(turn)을 답변에 반영한다 (멀티턴). 반영할 turn 수와 방식은 구현이 정한다. 이력을 쓴 요청은 캐시 키에 이력을 반영하거나 캐시를 우회한다."], "members": [{"name": "answer", "kind": "method", "async": true, "sig": "async answer(request: QueryRequest, ctx: RequestContext) -> QAResult"}]}, "SessionService": {"summary": "세션 조회. 기록은 QAService 가 쓰고 이 서비스가 읽는다. 이력은 영구 저장되며 만료되지 않는다.", "rules": ["한 번도 기록되지 않은 세션은 None 을 돌려준다 (예외 아님). 라우터가 404 + ApiError 로 바꾼다. 세션은 만료되지 않으므로 SessionInfo.expires_at 은 항상 None 이다.", "turns 는 오래된 것 → 최신 순으로 최근 limit 개만, turn_count 는 전체 개수.", "status=error 응답은 turn 으로 기록하지 않는다.", "기록하는 question 은 이메일·API 키 모양 문자열을 가린 값이다 (대화 복원 때 입력 원문과 다를 수 있다).", "세션 ID 를 아는 사람은 누구나 조회할 수 있다 (인증 없음). 추측 불가능한 값(UUID)을 쓴다."], "members": [{"name": "get", "kind": "method", "async": true, "sig": "async get(session_id: str, limit: int = 20) -> SessionInfo | None"}]}, "AnswerEvaluator": {"summary": "RAGAS Faithfulness(+선택 지표) + LLM-as-a-Judge(사실·조건·근거·판단).", "rules": ["입력 순서와 같은 순서로 평가 결과를 돌려준다 (len 동일).", "사실 주장이 없는 응답의 Faithfulness 는 not_applicable, 평가 호출 실패는 unavailable.", "정답·채점 기준(GradingSpec)은 평가 호출에만 전달한다. 서비스 생성 입력이나 final_context 에 섞지 않는다.", "선택 지표(answer_relevancy · context_recall · context_precision)는 ragas_extra 에 키로 담는다. answer_relevancy 는 질문 임베딩이 필요하므로 생성 시 Embedder 를 주입받는다.", "보안 문항은 security.bad_claims 가 응답에 나타나면 해당 항목을 감점한다 (판정 방식은 구현이 정한다).", "채점 호출의 시간·토큰은 서비스 응답의 meta 에 합산하지 않는다."], "members": [{"name": "evaluate", "kind": "method", "async": true, "sig": "async evaluate(records: Sequence[AnswerEvalRecord]) -> list[AnswerEvaluation]"}]}}, "modules": [{"id": "chunking", "name": "청킹", "scope": "문서 청킹·인덱싱 · 검색 청크 골든 데이터셋", "provides": ["Embedder", "Indexer", "GoldenDatasetProvider"], "injected": [], "entry": ["create_embedder()", "create_indexer(embedder)", "create_golden_provider()"], "types": ["Chunk", "IndexManifest", "IndexBuildRequest", "IndexProgress", "IngestFailure", "GoldenItem", "EvidenceRef", "GradingSpec", "SecurityInfo", "Split", "ExpectedAction"]}, {"id": "retrieval", "name": "검색", "scope": "RAG 구현 · 검색 청크 품질 테스트", "provides": ["Retriever", "RetrievalEvaluator"], "injected": ["Embedder", "IndexManifest"], "entry": ["create_retriever(embedder, index)", "create_retrieval_evaluator(retriever)"], "types": ["RetrievalMode", "RetrievalRequest", "RetrievalResult", "RetrievedChunk", "RetrievalReport", "RetrievalItemMetrics", "EvidenceUnit", "GoldenItem", "EvidenceRef", "Score"]}, {"id": "backend", "name": "백엔드", "scope": "FastAPI · LangChain · Langfuse · Redis", "provides": ["QAService", "SessionService", "AnswerEvaluator"], "injected": ["Retriever", "IndexManifest"], "entry": ["create_qa_service(retriever)", "create_session_service()", "create_answer_evaluator(embedder)", "create_router(qa_service, session_service, index)"], "types": ["QueryRequest", "QueryResponse", "QAResult", "ContextItem", "Citation", "QueryMeta", "HealthResponse", "SessionInfo", "SessionTurn", "ApiError", "AnswerEvalRecord", "AnswerEvaluation", "JudgeScores", "RequestContext", "AnswerStatus", "ErrorCode"]}, {"id": "frontend", "name": "프론트엔드", "scope": "React 클라이언트", "provides": [], "injected": [], "entry": [], "types": ["QueryRequest", "QueryResponse", "HealthResponse", "SessionInfo", "SessionTurn", "ApiError", "AnswerStatus", "Citation", "QueryMeta", "RetrievalMode", "ErrorCode"]}], "flows": [{"id": "flow-index", "from": "청킹", "to": "검색", "via": "Qdrant 인덱스", "types": ["Chunk", "IndexManifest"], "rules": ["색인 payload는 Chunk 스키마를 따른다", "질의 임베딩의 embedder_id(모델·접두사·정규화·최대 길이)는 IndexManifest.embedder_id와 같아야 한다 (다르면 IndexNotReadyError)", "모든 청크는 manifest.max_chunk_tokens 이하여야 하고, 검색은 시작 시 자기 리랭커 한도와 대조한다", "manifest.fingerprint가 다른 인덱스끼리는 평가 결과를 비교하지 않는다", "빠진 문서·실패는 manifest.failures에 남긴다 (조용히 건너뛰지 않는다)", "질문·정답·채점 기준 JSON은 색인하지 않는다"]}, {"id": "flow-retrieve", "from": "검색", "to": "백엔드", "via": "Retriever.retrieve()", "types": ["RetrievalRequest", "RetrievalResult", "RetrievedChunk"], "rules": ["결과 길이 ≤ k, rank는 1부터 연속, chunk_id 중복 없음", "빈 결과는 정상 (예외 아님)", "세 검색 방식은 mode로만 바꾼다. 같은 임베딩·저장소·k를 쓴다", "질문이 임베더 한도를 넘으면 InvalidInputError가 그대로 전파된다 (HTTP 400)", "백엔드는 검색 구현을 import하지 않고 주입받은 Retriever로만 호출한다"]}, {"id": "flow-http", "from": "백엔드", "to": "프론트엔드", "via": "HTTP /query · /health · /session", "types": ["QueryRequest", "QueryResponse", "HealthResponse", "SessionInfo"], "rules": ["정상 처리된 answered · needs_clarification · abstained 는 모두 200, 입력 검증 실패는 422", "status=error 는 서버 코드만 부여하고 error_code가 HTTP 상태를 결정한다", "answered 응답은 출처(문서명·페이지)를 1개 이상 가진다", "source_id(S1…)는 요청 안에서만 유효하며 화면에 노출하지 않는다", "GET /session/{id}: 없거나 만료된 세션은 404 + ApiError(session_not_found). 세션 ID는 클라이언트가 UUID로 만들어 보낸다"]}], "http": {"paths": {"health": "/health", "query": "/query", "session": "/session/{session_id}"}, "sessionNotFound": 404, "sessionLimit": {"default": 20, "max": 100}, "errors": {"invalid_input": 400, "index_not_ready": 503, "retrieval_failed": 502, "model_timeout": 504, "model_failed": 502, "output_invalid": 502, "internal": 500}, "statusUi": {"answered": "답변 + 출처(문서명·페이지)", "needs_clarification": "되묻는 문장 + 보완 질문 입력", "abstained": "보류 이유 + 필요한 자료 설명 (오류처럼 보이지 않게 구분)", "error": "사용자용 오류 문구. error_code는 로그용"}}, "examples": {"golden_item": {"id": "DEMO-DEV-01", "split": "development", "question": "가상해운 부산–LA 안내가 적용되는 항로와 장비는 무엇인가요?", "expected_action": "answer", "reference_answer": "부산 출발 LA 도착의 일반 건화물 운송이며 장비는 20GP와 40GP입니다.", "evidence_groups": [[{"book_id": "DEMO02", "page": 7, "quote": "본 안내의 대상은 부산 출발, 로스앤젤레스 도착의 일반 건화물 컨테이너 운송이다."}], [{"book_id": "DEMO01", "page": 1, "quote": "대상 장비는 20GP와 40GP다."}, {"book_id": "DEMO01", "page": 21, "quote": "(같은 사실을 뒷받침하는 대체 후보 — 둘 중 하나만 맞아도 이 그룹은 만족)"}]], "grading": {"required_facts": ["부산–LA 단일 항로", "20GP와 40GP"], "forbidden_claims": ["모든 항로·화물에 적용"], "conditions": [], "grading_notes": "같은 의미의 표현을 허용한다."}, "security": null}, "health_ok": {"status": "ok", "index_ready": true, "index_name": "demo-index", "embedder_id": "demo-embedder", "supported_modes": ["naive", "hybrid", "hybrid_rerank"]}, "query_abstained": {"request_id": "demo-003", "status": "abstained", "answer": "현장 확인 메모는 15분, 장비 설정 기록은 20분으로 다릅니다. 적용할 값을 정할 근거가 없어 답변을 보류합니다. 해당 장비의 확정된 설정이나 정정 기록이 필요합니다.", "reason": "같은 대상과 날짜의 값이 다르고 우선 적용할 근거가 없습니다.", "citations": [{"source_id": "S1", "book_id": "DEMO_MEMO", "file_name": "DEMO_MEMO.pdf", "page": 2}, {"source_id": "S2", "book_id": "DEMO_SETTING", "file_name": "DEMO_SETTING.pdf", "page": 4}], "error_code": null, "meta": {"retrieval_mode": "hybrid_rerank", "latency_ms": 2210.0, "input_tokens": 700, "output_tokens": 96, "cache_hit": true, "trace_id": null}}, "query_answered": {"request_id": "demo-001", "status": "answered", "answer": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 15분입니다.", "reason": "장비 A에 적용되는 정정 공지가 기존 10분을 15분으로 바꿉니다.", "citations": [{"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}], "error_code": null, "meta": {"retrieval_mode": "hybrid", "latency_ms": 1840.5, "input_tokens": 612, "output_tokens": 74, "cache_hit": false, "trace_id": "demo-trace-001"}}, "query_error": {"request_id": "demo-error-001", "status": "error", "answer": "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", "reason": "model_timeout", "citations": [], "error_code": "model_timeout", "meta": {"retrieval_mode": "hybrid", "latency_ms": 30000.0, "input_tokens": null, "output_tokens": null, "cache_hit": false, "trace_id": null}}, "query_needs_clarification": {"request_id": "demo-002", "status": "needs_clarification", "answer": "장비 모델과 확인하려는 기준일을 알려 주세요.", "reason": "모델과 적용일에 따라 값이 달라집니다.", "citations": [{"source_id": "S1", "book_id": "DEMO_MANUAL", "file_name": "DEMO_MANUAL.pdf", "page": 3}, {"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}], "error_code": null, "meta": {"retrieval_mode": "naive", "latency_ms": 1500.0, "input_tokens": 540, "output_tokens": 40, "cache_hit": false, "trace_id": null}}, "query_request": {"question": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 몇 분인가요?", "retrieval_mode": "hybrid"}, "session_info": {"session_id": "demo-session-0001", "created_at": "2026-11-06T09:00:00Z", "last_active_at": "2026-11-06T09:02:10Z", "expires_at": null, "turn_count": 2, "turns": [{"request_id": "demo-002", "asked_at": "2026-11-06T09:00:05Z", "question": "장비 A의 자동 화면 꺼짐 시간은 몇 분인가요?", "retrieval_mode": "naive", "status": "needs_clarification", "answer": "장비 모델과 확인하려는 기준일을 알려 주세요.", "citations": [{"source_id": "S1", "book_id": "DEMO_MANUAL", "file_name": "DEMO_MANUAL.pdf", "page": 3}]}, {"request_id": "demo-001", "asked_at": "2026-11-06T09:02:10Z", "question": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 몇 분인가요?", "retrieval_mode": "hybrid", "status": "answered", "answer": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 15분입니다.", "citations": [{"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}]}]}, "session_not_found": {"error_code": "session_not_found", "message": "세션을 찾을 수 없습니다."}}}</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const $ = (s, r = document) => r.querySelector(s);
+
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of kids.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+
+const providerOf = {};
+D.modules.forEach(m => m.provides.forEach(i => providerOf[i] = m.id));
+const moduleName = id => (D.modules.find(m => m.id === id) || {}).name || id;
+
+function linkify(text) {
+  return String(text).split(/(\w+)/).map(tok => {
+    if (D.types[tok]) return h('button', { class: 'tlink', type: 'button', onclick: () => openType(tok) }, tok);
+    if (D.interfaces[tok]) return h('button', { class: 'tlink if', type: 'button', onclick: () => openInterface(tok) }, tok);
+    return tok;
+  });
+}
+const chips = names => h('div', { class: 'chips' }, names.map(n => linkify(n)));
+
+/* ───────── 탭 ───────── */
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['map', 'types', 'http'].forEach(t => { $('#tab-' + t).hidden = (t !== name); });
+}
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ───────── 모듈 지도 ───────── */
+let selected = { kind: 'module', id: 'backend' };
+
+function select(kind, id) {
+  selected = { kind, id };
+  document.querySelectorAll('.map [data-kind]').forEach(g => {
+    g.classList.toggle('sel', g.dataset.kind === kind && g.dataset.id === id);
+  });
+  renderDetail();
+}
+document.querySelectorAll('.map [data-kind]').forEach(g => {
+  g.setAttribute('tabindex', '0');
+  g.setAttribute('role', 'button');
+  g.addEventListener('click', () => select(g.dataset.kind, g.dataset.id));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(g.dataset.kind, g.dataset.id); } });
+});
+
+function interfaceCard(name) {
+  const it = D.interfaces[name];
+  return h('div', { class: 'card', id: 'if-' + name },
+    h('h2', {}, name, h('span', { class: 'badge' }, 'Protocol')),
+    h('p', { class: 'muted', style: 'margin:0 0 6px' }, it.summary),
+    h('pre', {}, it.members.map(m => m.sig).join('\n')),
+    it.rules.length ? [h('h3', {}, '구현이 반드시 지킬 계약'), h('ul', { class: 'rules' }, it.rules.map(r => h('li', {}, r)))] : null
+  );
+}
+
+function renderDetail() {
+  const box = $('#detail');
+  box.replaceChildren();
+  if (selected.kind === 'flow') {
+    const f = D.flows.find(x => x.id === selected.id);
+    box.append(h('div', { class: 'card sel' },
+      h('h2', {}, `${f.from} → ${f.to}`, h('span', { class: 'badge' }, '데이터 흐름')),
+      h('p', { class: 'muted', style: 'margin:0' }, '방식: ' + f.via),
+      h('h3', {}, '오가는 타입'), chips(f.types),
+      h('h3', {}, '이 경로에서 지켜야 할 규칙'),
+      h('ul', { class: 'rules' }, f.rules.map(r => h('li', {}, r)))
+    ));
+    return;
+  }
+  const m = D.modules.find(x => x.id === selected.id);
+  box.append(h('div', { class: 'card sel' },
+    h('h2', {}, m.name + ' 모듈'),
+    h('p', { class: 'muted', style: 'margin:0' }, m.scope),
+    m.entry.length ? [h('h3', {}, '진입점 (app이 호출)'), h('pre', {}, m.entry.join('\n'))] : null,
+    h('h3', {}, '주입받는 것'),
+    m.injected.length ? chips(m.injected) : h('p', { class: 'muted', style: 'margin:0' }, m.id === 'frontend' ? '없음 — contracts/openapi.json 으로만 백엔드와 소통' : '없음'),
+    h('h3', {}, '관련 타입'), chips(m.types)
+  ));
+  if (m.provides.length) {
+    box.append(...m.provides.map(interfaceCard));
+  } else {
+    box.append(h('div', { class: 'card' },
+      h('h2', {}, '화면이 구분해서 보여야 하는 것'),
+      h('div', { class: 'scroll' }, h('table', {},
+        h('thead', {}, h('tr', {}, h('th', {}, 'status'), h('th', {}, '화면 책임'))),
+        h('tbody', {}, Object.entries(D.http.statusUi).map(([s, t]) => h('tr', {}, h('td', { class: 'mono status-' + s }, s), h('td', {}, t))))
+      )),
+      h('p', { class: 'muted', style: 'margin:8px 0 0' }, 'TS 타입은 openapi.json 에서 생성합니다. 손으로 따로 쓰지 않습니다.')
+    ));
+  }
+}
+
+function openInterface(name) {
+  showTab('map');
+  select('module', providerOf[name] || 'backend');
+  const el = document.getElementById('if-' + name);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ───────── 타입 사전 ───────── */
+let curType = 'QueryResponse';
+
+function renderTypeList() {
+  const nav = $('#type-list');
+  nav.replaceChildren();
+  D.groups.forEach(([g, names]) => {
+    nav.append(h('h4', {}, g));
+    names.forEach(n => nav.append(h('button', {
+      type: 'button', 'aria-current': String(n === curType),
+      onclick: () => { curType = n; renderTypeList(); renderTypeDetail(); }
+    }, n)));
+  });
+}
+
+function renderTypeDetail() {
+  const t = D.types[curType];
+  const box = $('#type-detail');
+  box.replaceChildren();
+  const head = h('h2', {}, curType, h('span', { class: 'badge' }, t.kind === 'enum' ? 'enum' : 'model'));
+  const card = h('div', { class: 'card' }, head);
+  if (t.doc) card.append(h('p', { class: 'muted', style: 'margin:0 0 8px' }, t.doc));
+  if (t.kind === 'enum') {
+    card.append(h('div', { class: 'scroll' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, '이름'), h('th', {}, '값'))),
+      h('tbody', {}, t.values.map(v => h('tr', {}, h('td', { class: 'mono' }, v.name), h('td', { class: 'mono' }, v.value))))
+    )));
+  } else {
+    card.append(h('div', { class: 'scroll' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, '필드'), h('th', {}, '타입'), h('th', {}, ''), h('th', {}, '제약 · 기본값'))),
+      h('tbody', {}, t.fields.map(f => h('tr', {},
+        h('td', { class: 'mono' }, f.name),
+        h('td', { class: 'mono' }, linkify(f.type)),
+        h('td', {}, f.required ? h('span', { class: 'req' }, '필수') : h('span', { class: 'opt' }, '선택')),
+        h('td', { class: 'mono muted' }, [...f.constraints, f.default != null ? '기본 ' + f.default : null].filter(Boolean).join(' · ') || '—')
+      )))
+    )));
+    if (t.invariants.length) {
+      card.append(h('h3', {}, '항상 성립해야 하는 규칙 (위반 시 검증 오류)'),
+        h('ul', { class: 'rules' }, t.invariants.map(r => h('li', {}, r))));
+    }
+  }
+  box.append(card);
+  const users = D.modules.filter(m => m.types.includes(curType));
+  if (users.length) box.append(h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, '이 타입을 다루는 모듈'),
+    h('div', { class: 'chips' }, users.map(m => h('button', { class: 'tlink', type: 'button', onclick: () => { showTab('map'); select('module', m.id); } }, m.name)))));
+}
+
+function openType(name) {
+  curType = name;
+  showTab('types');
+  renderTypeList();
+  renderTypeDetail();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ───────── HTTP · 예시 ───────── */
+let exKey = 'query_answered';
+const EX_LABELS = [
+  ['query_request', 'POST 요청'], ['query_answered', 'answered'], ['query_needs_clarification', 'needs_clarification'],
+  ['query_abstained', 'abstained'], ['query_error', 'error'], ['health_ok', 'GET /health'],
+  ['session_info', 'GET /session'], ['session_not_found', 'session 404']
+];
+
+function renderHttp() {
+  const box = $('#http-body');
+  box.replaceChildren();
+  box.append(h('div', { class: 'card' },
+    h('h2', {}, '엔드포인트'),
+    h('div', { class: 'scroll' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, '메서드'), h('th', {}, '경로'), h('th', {}, '요청'), h('th', {}, '응답'))),
+      h('tbody', {},
+        h('tr', {}, h('td', { class: 'mono' }, 'GET'), h('td', { class: 'mono' }, D.http.paths.health), h('td', {}, '—'), h('td', {}, linkify('HealthResponse'))),
+        h('tr', {}, h('td', { class: 'mono' }, 'POST'), h('td', { class: 'mono' }, D.http.paths.query), h('td', {}, linkify('QueryRequest')), h('td', {}, linkify('QueryResponse'))),
+        h('tr', {}, h('td', { class: 'mono' }, 'GET'), h('td', { class: 'mono' }, D.http.paths.session), h('td', {}, `limit (기본 ${D.http.sessionLimit.default}, 최대 ${D.http.sessionLimit.max})`), h('td', {}, linkify('SessionInfo'), ' · 404 ', linkify('ApiError')))
+      )
+    ))
+  ));
+  box.append(h('div', { class: 'card' },
+    h('h2', {}, 'error_code → HTTP 상태'),
+    h('p', { class: 'muted', style: 'margin:0 0 6px' }, `answered · needs_clarification · abstained 는 모두 200, 입력 검증 실패는 422 입니다. (이 표는 /query 용. /session 은 없거나 만료된 세션에 ${D.http.sessionNotFound} + ApiError)`),
+    h('div', { class: 'scroll' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, 'error_code'), h('th', {}, 'HTTP'))),
+      h('tbody', {}, Object.entries(D.http.errors).map(([c, s]) => h('tr', {}, h('td', { class: 'mono' }, c), h('td', { class: 'mono' }, s))))
+    ))
+  ));
+  const ex = D.examples[exKey];
+  const status = ex && ex.status;
+  const card = h('div', { class: 'card' },
+    h('h2', {}, '프론트 목업 예시', h('span', { class: 'badge' }, 'contracts/examples')),
+    h('div', { class: 'btnrow' }, EX_LABELS.filter(([k]) => D.examples[k]).map(([k, label]) =>
+      h('button', { class: 'btn', type: 'button', 'aria-pressed': String(k === exKey), onclick: () => { exKey = k; renderHttp(); } }, label))),
+    status ? h('p', { style: 'margin:4px 0' }, '화면 책임: ', h('b', { class: 'status-' + status }, status), ' — ', D.http.statusUi[status]) : null,
+    h('pre', {}, JSON.stringify(ex, null, 2))
+  );
+  box.append(card);
+}
+
+select('module', 'backend');
+renderTypeList();
+renderTypeDetail();
+renderHttp();
+</script>
+</body>
+</html>

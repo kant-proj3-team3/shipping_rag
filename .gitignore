@@ -1,0 +1,25 @@
+# 환경·시크릿
+.env
+.venv/
+# 데이터·산출물 (원본 PDF와 평가 정답은 커밋하지 않는다)
+data/
+qdrant_storage/
+.qdrant_local/
+.model_cache/
+*.zip
+# 파이썬
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# 프론트엔드
+node_modules/
+frontend/dist/
+# 편집기·OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# 목업 인덱서가 저장하는 manifest
+.mock_index/
+eval_reports/

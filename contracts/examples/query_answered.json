@@ -1,0 +1,18 @@
+{
+  "request_id": "demo-001",
+  "status": "answered",
+  "answer": "2026년 11월 2일 기준 장비 A의 자동 화면 꺼짐 시간은 15분입니다.",
+  "reason": "장비 A에 적용되는 정정 공지가 기존 10분을 15분으로 바꿉니다.",
+  "citations": [
+    {"source_id": "S2", "book_id": "DEMO_NOTICE", "file_name": "DEMO_NOTICE.pdf", "page": 1}
+  ],
+  "error_code": null,
+  "meta": {
+    "retrieval_mode": "hybrid",
+    "latency_ms": 1840.5,
+    "input_tokens": 612,
+    "output_tokens": 74,
+    "cache_hit": false,
+    "trace_id": "demo-trace-001"
+  }
+}

@@ -1,0 +1,51 @@
+# 프론트엔드 실행 구성: 화면(web, nginx)과 화면 로그를 저장하는 로그 서버(log-server, Node.js + winston).
+# 저장소 루트의 compose 로 api 를 먼저 띄운다. 그때 만들어지는 네트워크(rag-qa_default)로 web 이 api 를 찾는다.
+#
+#   docker compose -f frontend/docker-compose.yml up -d --build
+#   docker compose -f frontend/docker-compose.yml down
+#
+# 화면 로그는 frontend/logs/ 의 날짜별 파일에 쌓인다. 컨테이너를 지워도 남는다.
+
+name: shipping-rag-web
+
+x-logging: &limited-logging # docker logs 가 끝없이 쌓이지 않게 크기를 묶는다
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    networks:
+      - default
+      - rag-qa
+    logging: *limited-logging
+    restart: unless-stopped
+
+  log-server: # 포트를 밖으로 열지 않는다. 브라우저 요청은 web 의 /client-logs 로만 들어온다 (요청 수 · 크기 제한)
+    build:
+      context: .
+      target: log-server
+    user: "${LOG_UID:-1000}" # Linux 에서 frontend/logs/ 소유자가 uid 1000 이 아니면 LOG_UID 로 맞춘다
+    environment:
+      TZ: Asia/Seoul # 로그 시각과 파일 날짜의 기준
+    volumes:
+      - ./logs:/var/log/shipping-rag
+    logging: *limited-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  rag-qa:
+    external: true
+    name: rag-qa_default

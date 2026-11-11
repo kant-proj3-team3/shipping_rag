@@ -1,0 +1,131 @@
+# 로컬 개발·시연용. 모든 서비스가 같은 네트워크에서 서비스 이름으로 서로를 찾는다.
+# api·cli 는 기본으로 실제 구현(청킹·검색·백엔드)으로 조립된다. 목업으로 돌리려면 .env 에 APP_IMPL=mock.
+#
+#   docker compose up -d qdrant redis postgres           # 인프라만
+#   docker compose --profile tools run --rm cli index    # 색인(처음 한 번. 몇 분 걸린다). 다시 만들려면 index --rebuild
+#   docker compose up -d --build                         # 전체: qdrant + redis + postgres + api
+#   docker compose restart api                           # 색인 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다 (그 전에는 /health 의 index_ready=false)
+#   docker compose --profile tools run --rm cli eval --k 5 --unit page   # 검색 평가
+#   docker compose --profile tools run --rm cli eval-answer --limit 3    # 답변 평가(모델 호출). 보고서는 ./eval_reports
+#   docker compose --profile tools run --rm cli compare-security         # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출)
+#   docker compose down                                  # 중지(데이터 볼륨은 유지) / down -v 는 인덱스·대화 이력까지 삭제
+#
+# 전제: .env 파일은 선택이지만 실제 구현은 OPENAI_API_KEY 가 필요하다(.env.example을 복사해 쓴다). INDEX_NAME 은 자리표시자를 고쳐 쓴다.
+# api·cli는 루트 pyproject.toml/uv.lock 과 app/ 이 있어야 빌드된다.
+
+name: rag-qa
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest   # 팀이 버전을 정하면 고정한다 (색인 호환성)
+    ports:
+      - "6333:6333"   # REST
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage   # 이 볼륨이 인덱스 원본. 없으면 컨테이너를 지울 때 인덱스도 사라진다
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # 세션과 캐시가 같은 Redis를 쓴다. maxmemory 초과 시 TTL이 있는 키만 지우므로 모든 키에 TTL을 둔다.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    # 세션 이력의 원본(G2). 이 볼륨이 이력 원본이라 `down -v` 는 대화 이력까지 지운다. 계정은 로컬 개발용 기본값이다.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rag}
+      POSTGRES_DB: ${POSTGRES_DB:-rag}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:   # FastAPI 앱 = app/api.py 가 백엔드·검색·청킹(임베더) 모듈을 조립한 컨테이너
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "app.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - path: .env
+        required: false   # 새 클론에서 .env 가 없어도 기본값으로 뜬다 (.env.example 을 복사해 쓴다)
+    environment:
+      # .env 의 localhost 주소를 컨테이너 네트워크 주소로 덮어쓴다
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag}@postgres:5432/${POSTGRES_DB:-rag}
+      RAG_MODEL_CACHE: /models
+      MOCK_INDEX_DIR: /mock_index   # APP_IMPL=mock 일 때만 쓴다: cli 가 색인한 manifest 를 api 가 읽는다(실제 구현은 Qdrant 가 인덱스 원본)
+    ports:
+      - "8000:8000"
+    volumes:
+      - model_cache:/models   # 임베딩 모델(E5 등)을 한 번만 내려받는다
+      - mock_index:/mock_index
+    depends_on:
+      qdrant:
+        condition: service_started   # 앱은 시작 시 Qdrant 연결을 재시도해야 한다 (/health 가 index_ready 로 준비 여부를 알린다)
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy   # 앱은 DB 가 늦게 떠도 기동하지만(세션 기록만 건너뛴다), 처음부터 기록되도록 기다린다
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s   # 모델 로딩 시간
+    restart: unless-stopped
+
+  cli:   # 배치 CLI(인덱싱·평가). 평소에는 뜨지 않고 `--profile tools run` 으로만 실행한다
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "app.cli"]
+    env_file:
+      - path: .env
+        required: false   # 새 클론에서 .env 가 없어도 기본값으로 뜬다 (.env.example 을 복사해 쓴다)
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag}@postgres:5432/${POSTGRES_DB:-rag}
+      RAG_MODEL_CACHE: /models
+      DOCUMENTS_DIR: /data/documents
+      EVALUATION_DIR: /data/evaluation
+      MOCK_INDEX_DIR: /mock_index   # APP_IMPL=mock 일 때만 쓴다
+    volumes:
+      - ./data:/data:ro   # 원본 PDF·평가 JSON (저장소에 커밋하지 않는다). 읽기 전용
+      - ./eval_reports:/app/eval_reports   # 평가 보고서(eval-answer·compare-security). 커밋하지 않는다
+      - model_cache:/models
+      - mock_index:/mock_index
+    depends_on:
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+volumes:
+  qdrant_data:
+  redis_data:
+  postgres_data:   # 세션 이력 원본. down -v 는 이것도 지운다
+  model_cache:
+  mock_index:   # APP_IMPL=mock 일 때만 쓰는 목업 인덱서 manifest. down -v 는 이것도 지운다

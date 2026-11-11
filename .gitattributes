@@ -1,0 +1,14 @@
+# 줄바꿈을 LF로 통일한다 (Windows·macOS·Linux 혼용). 체크아웃도 LF다.
+* text=auto eol=lf
+
+# 바이너리는 변환하지 않는다
+*.pdf binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pptx binary

@@ -1,0 +1,19 @@
+[project]
+name = "retrieval"
+version = "0.1.0"
+description = "Naive / 하이브리드 / 하이브리드+리랭킹 검색과 검색 품질 평가"
+requires-python = ">=3.12"
+dependencies = ["common", "pydantic>=2.7", "qdrant-client>=1.10", "rank-bm25>=0.2.2", "sentence-transformers>=3.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retrieval"]
+
+[tool.uv.sources]
+common = { workspace = true }
+
+[tool.rag-contract]
+version = "0.1.0"

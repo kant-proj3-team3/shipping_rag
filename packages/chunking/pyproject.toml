@@ -1,0 +1,25 @@
+[project]
+name = "chunking"
+version = "0.1.0"
+description = "문서 청킹·임베딩·색인, 골든 데이터셋 제공"
+requires-python = ">=3.12"
+dependencies = [
+    "common",
+    "pydantic>=2.7",
+    "pdfplumber==0.11.10",          # 표 인식·글자 크기. 버전이 바뀌면 추출 결과가 달라질 수 있어 고정한다
+    "qdrant-client>=1.10",
+    "sentence-transformers>=3.0",   # E5 임베딩 (retrieval 과 같은 범위)
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chunking"]
+
+[tool.uv.sources]
+common = { workspace = true }
+
+[tool.rag-contract]
+version = "0.1.0"

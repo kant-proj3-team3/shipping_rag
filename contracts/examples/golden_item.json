@@ -1,0 +1,19 @@
+{
+  "id": "DEMO-DEV-01",
+  "split": "development",
+  "question": "가상해운 부산–LA 안내가 적용되는 항로와 장비는 무엇인가요?",
+  "expected_action": "answer",
+  "reference_answer": "부산 출발 LA 도착의 일반 건화물 운송이며 장비는 20GP와 40GP입니다.",
+  "evidence_groups": [
+    [{"book_id": "DEMO02", "page": 7, "quote": "본 안내의 대상은 부산 출발, 로스앤젤레스 도착의 일반 건화물 컨테이너 운송이다."}],
+    [{"book_id": "DEMO01", "page": 1, "quote": "대상 장비는 20GP와 40GP다."},
+     {"book_id": "DEMO01", "page": 21, "quote": "(같은 사실을 뒷받침하는 대체 후보 — 둘 중 하나만 맞아도 이 그룹은 만족)"}]
+  ],
+  "grading": {
+    "required_facts": ["부산–LA 단일 항로", "20GP와 40GP"],
+    "forbidden_claims": ["모든 항로·화물에 적용"],
+    "conditions": [],
+    "grading_notes": "같은 의미의 표현을 허용한다."
+  },
+  "security": null
+}
