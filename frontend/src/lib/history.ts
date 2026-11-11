@@ -21,7 +21,7 @@ const SHRINK_RATIO = 0.8;
 /** 저장소 용량 초과 예외 이름. NS_ERROR_DOM_QUOTA_REACHED 는 구버전 Firefox 가 쓴다 */
 const QUOTA_ERROR_NAMES: readonly string[] = ["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"];
 
-/** 저장 결과. trimmed 는 용량이 모자라 오래된 대화 일부를 저장본에서 뺀 경우다 */
+/** 저장 결과. trimmed 는 보관 한도(대화 수 MAX_CONVERSATIONS · 저장소 용량)를 넘어 오래된 대화 일부를 저장본에서 뺀 경우다 */
 export type SaveResult = "saved" | "trimmed" | "failed";
 
 /** 불러온 대화 목록 */
@@ -134,11 +134,12 @@ export function loadHistory(storage: KeyValueStorage): LoadedHistory {
 /**
  * 대화 목록을 저장한다 (최신순 최대 MAX_CONVERSATIONS 개). 용량이 넘치면 오래된 대화부터 줄여 다시 쓴다.
  *
- * @returns 그대로 저장했으면 saved, 일부를 줄였으면 trimmed, 저장할 수 없으면 failed
+ * @returns 그대로 저장했으면 saved, 대화 수 · 용량 한도로 일부를 뺐으면 trimmed, 저장할 수 없으면 failed
  */
 export function saveHistory(storage: KeyValueStorage, conversations: Conversation[]): SaveResult {
   let keep = sortByRecent(conversations).slice(0, MAX_CONVERSATIONS);
-  let result: SaveResult = "saved";
+  // 한도를 넘은 대화는 저장본에 없어 새로고침하면 사라지므로 알린다
+  let result: SaveResult = keep.length < conversations.length ? "trimmed" : "saved";
   for (;;) {
     try {
       storage.setItem(
@@ -173,18 +174,24 @@ export function sortByRecent(conversations: Conversation[]): Conversation[] {
  * - 양쪽에 다 있는 대화는 더 최근에 바뀐 쪽을 쓴다. 같으면 이 탭 것을 쓴다 (받는 중인 답변이 저장본에는 중지로 읽힌다)
  * - 저장본에 없는 대화는 다른 탭이 지운 것으로 보고 뺀다. 이 탭에서 답변을 받는 중인 대화는 남긴다
  * - 보고 있던 대화가 빠지면 새 대화 화면으로 돌린다
+ *
+ * @param isUnsaved 이 탭이 마지막 저장에 실패했다. 저장본에 없는 대화가 이 탭에서만 있는(저장하지 못한) 대화일 수 있어 빼지 않는다
  */
-export function mergeFromOtherTab(local: LoadedHistory, stored: Conversation[]): LoadedHistory {
+export function mergeFromOtherTab(
+  local: LoadedHistory,
+  stored: Conversation[],
+  isUnsaved = false,
+): LoadedHistory {
   const localById = new Map(local.conversations.map((c) => [c.id, c]));
   const storedIds = new Set(stored.map((c) => c.id));
   const merged = stored.map((theirs) => {
     const mine = localById.get(theirs.id);
     return mine !== undefined && mine.updatedAt >= theirs.updatedAt ? mine : theirs;
   });
-  const receiving = local.conversations.filter(
-    (c) => !storedIds.has(c.id) && hasPendingAnswer(c.messages),
+  const kept = local.conversations.filter(
+    (c) => !storedIds.has(c.id) && (isUnsaved || hasPendingAnswer(c.messages)),
   );
-  const conversations = sortByRecent([...receiving, ...merged]);
+  const conversations = sortByRecent([...kept, ...merged]);
   // 목록에 없던 보고 있던 대화(서버 기록으로 채우는 중)는 건드리지 않는다
   const isCurrentListed = localById.has(local.currentId ?? "");
   const isGone = isCurrentListed && !conversations.some((c) => c.id === local.currentId);
