@@ -123,7 +123,7 @@ export function App() {
 
       {/* 서랍이 열린 동안 Tab 이 서랍 뒤로 빠지지 않게 한다 */}
       <main className="flex min-w-0 flex-1 flex-col" inert={isDrawerOpen}>
-        <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+        <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           {isDrawer ? (
             <button
               ref={triggerRef}
