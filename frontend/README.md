@@ -62,13 +62,8 @@ PowerShell에서는 다음과 같습니다.
 
 하루 20MB를 넘으면 로그를 버리지 않고 `client-2026-11-09-overflow.log`에 이어 씁니다. 넘침 파일은 최근 10개(100MB)만 유지하고 오래된 것부터 지우므로, 요청이 몰려도 날짜별 로그는 밀려나지 않습니다. 한도는 `log-server`를 다시 시작하면 처음부터 다시 셉니다.
 
-`ERROR`의 스택은 소스맵으로 원본 파일 위치로 바꿔 남깁니다. 소스맵은 `log-server` 이미지에만 있고 화면으로 공개되지 않습니다.
-
-질문 · 답변 · 세션 id는 보내지 않습니다. 입구가 인증 없이 열려 있어 누구나 로그를 보낼 수 있으니, 디버깅 자료로만 씁니다. `log-server`가 꺼져 있어도 화면은 그대로 동작하고, 그동안의 로그만 남지 않습니다.
-
-Linux에서 `frontend/logs/` 소유자의 uid가 1000이 아니면 `LOG_UID=$(id -u)`를 붙여 실행합니다. 파일을 쓸 수 없으면 `log-server`는 멈추지 않고 콘솔(`docker compose -f frontend/docker-compose.yml logs log-server`)에만 남기면서 원인을 출력합니다.
-
-`/client-logs`는 프론트엔드 안의 약속이라 `contracts/openapi.json`에 없습니다. 형식은 `shared/clientLog.ts`에 있고, 보내는 쪽은 `src/lib/logger.ts`, 받는 쪽은 `server/src/app.ts`입니다.
+`/client-logs` 프론트엔드에서만 사용하는 로그 입니다.
+형식은 `shared/clientLog.ts`에 있고, 보내는 쪽은 `src/lib/logger.ts`, 받는 쪽은 `server/src/app.ts`입니다.
 
 ## API 타입 다시 만들기
 
@@ -88,4 +83,10 @@ npm run typecheck
 
 `check:api`는 생성 파일이 지금의 `openapi.json`과 같은지만 보고, 다르면 오류로 끝납니다. `typecheck`는 화면 코드가 바뀐 타입에 맞는지 확인합니다.
 
-`gen:api`가 `gen-schemas: schema-descriptions.mjs: 없는 필드 "HealthResponse.index_ready"`처럼 멈추면 계약에서 그 필드가 빠졌거나 설명이 생긴 것이니 `scripts/schema-descriptions.mjs`에서 그 항목을 지웁니다. 그 밖의 오류는 생성 스크립트가 다루지 않는 스키마 형식이라 `scripts/gen-schemas.mjs`를 고쳐야 합니다.
+| 파일                                     | 역할                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `contracts/openapi.json`                 | 서버 API 계약 원본. 아래 파일을 만드는 기준                              |
+| `scripts/gen-schemas.mjs`                | `openapi.json`을 읽어 `schemas.generated.ts`를 만드는 스크립트           |
+| `scripts/schema-descriptions.mjs`        | 계약에 설명이 없는 항목의 설명 모음. 생성 타입의 주석으로 들어감         |
+| `src/api/generated/openapi.d.ts`         | 서버 형식(snake_case) TS 타입. `openapi-typescript`가 생성               |
+| `src/api/generated/schemas.generated.ts` | 응답 검증 zod 스키마 · 화면 타입(camelCase) · 변환 함수 · 요청 제약 상수 |

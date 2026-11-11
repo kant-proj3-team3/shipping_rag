@@ -7,6 +7,7 @@
 
     answer(request, ctx)
       ├─ load_history(...)                  G3: session_id 가 있으면 이전 대화를 읽는다. 실패하면 단발로 답한다
+      ├─ cache.get(...)                     H: 이력이 없는 요청만. 적중하면 아래를 건너뛰고 세션 기록만 하고 응답한다
       ├─ retriever.retrieve(...)            실패 → invalid_input / index_not_ready / retrieval_failed
       ├─ build_context(...)                 B: 토큰 예산 적용
       ├─ 문맥이 비면                         모델 호출 없이 abstained
@@ -14,7 +15,7 @@
       │    ├─ ModelTimeoutError             → model_timeout
       │    ├─ ModelCallError                → model_failed
       │    └─ outcome.answer is None        → output_invalid
-      └─ 세션 기록(error 제외) → QueryResponse
+      └─ 세션 기록(error 제외) → 캐시 저장(error 제외) → QueryResponse
 
 규칙
 ----
@@ -25,6 +26,9 @@
   모델 호출이 예외로 끝난 요청은 응답을 받지 못해 토큰을 알 수 없으므로 None 이다.
 - 세션 기록 실패는 응답을 실패로 만들지 않는다(기록만 건너뛴다). 세션 이력 조회 실패도 마찬가지로 이력 없이 단발로 답한다.
 - 멀티턴은 이전 대화를 프롬프트에만 넣는다. 검색은 원문 질문으로 하고, 검색 자료(`final_context`)에는 이력이 들어가지 않는다.
+- 답변 캐시(H)는 부가 기능이다. 읽기·쓰기가 실패해도 캐시 없이 처리한다(읽기에 실패하면 쓰기도 시도하지 않는다). 이력이 프롬프트에 들어가는
+  요청은 읽지도 쓰지도 않는다. 적중해도 세션 기록은 한다. 적중한 응답은 `meta.cache_hit=True` 이고 이번 요청에서 모델을 부르지 않았으므로
+  토큰은 None 이다. `status=error` 는 저장하지 않는다. 자세한 키 구성은 cache.py 모듈 docstring 참고.
 - Langfuse 기록(F)은 주입받은 `Tracer` 로 하고, 어떤 트레이서든 장애 격리 래퍼를 씌운다. `meta.trace_id` 는 기록을 시작했을 때만
   채운다(tracing.py 모듈 docstring 참고). 기록이 실패해도 응답은 그대로 나간다.
 """
@@ -38,14 +42,17 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
-from backend.chain import AnswerChain, ModelCallError, ModelTimeoutError
+from backend.cache import AnswerCache, CacheKey, normalize_question
+from backend.chain import AnswerGenerator, ModelCallError, ModelTimeoutError
 from backend.context import ContextBuild, build_context, context_max_tokens
 from backend.history import HistorySource, history_max_turns, load_history
 from backend.prompts import HistoryTurn, PromptVariant, prompt_version
 from backend.tracing import (
+    STEP_CACHE,
     STEP_CONTEXT,
     STEP_HISTORY,
     STEP_RETRIEVE,
+    STEP_SESSION,
     NoopTracer,
     RequestTrace,
     TraceStep,
@@ -130,7 +137,7 @@ class BackendQAService:
     def __init__(
         self,
         retriever: Retriever,
-        chain: AnswerChain,
+        chain: AnswerGenerator,
         sessions: SessionRecorder,
         *,
         default_mode: RetrievalMode = DEFAULT_MODE,
@@ -138,10 +145,13 @@ class BackendQAService:
         variant: PromptVariant = PromptVariant.BASE,
         tracer: Tracer | None = None,
         history: HistorySource | None = None,
+        cache: AnswerCache | None = None,
     ) -> None:
         self._retriever = retriever
         self._chain = chain
         self._sessions = sessions
+        # 답변 캐시: 없으면 항상 새로 만든다(평가를 돌릴 때처럼 끄고 싶을 때도 None 을 준다).
+        self._cache = cache
         # 멀티턴: 이력을 읽을 저장소(보통 `sessions` 와 같은 객체). 없으면 단발로만 동작한다.
         self._history = history
         self._default_mode = default_mode
@@ -171,13 +181,16 @@ class BackendQAService:
         active: TraceStep | None = None  # 실패했을 때 오류로 닫을 단계
         trace_id = trace.trace_id  # 기록을 시작하지 못했으면 None
 
-        def meta(input_tokens: int | None = None, output_tokens: int | None = None) -> QueryMeta:
+        def meta(
+            input_tokens: int | None = None, output_tokens: int | None = None, *, cache_hit: bool = False
+        ) -> QueryMeta:
             # 호출 시점에 재서 실패 응답에도 시간이 채워진다. 확인 못 한 값은 None 으로 둔다.
             return QueryMeta(
                 retrieval_mode=mode,
                 latency_ms=(time.perf_counter() - started) * 1000,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                cache_hit=cache_hit,
                 trace_id=trace_id,
             )
 
@@ -196,6 +209,19 @@ class BackendQAService:
             return QAResult(response=resp, final_context=final_context())  # 오류는 세션에 기록하지 않는다
 
         history = await self._load_history(request, ctx, trace)  # 실패해도 예외 없이 빈 이력이다
+
+        # 답변 캐시. 이력이 프롬프트에 들어가는 요청은 같은 질문이라도 답이 달라지므로 읽지도 쓰지도 않는다.
+        cache_key: str | None = None
+        if self._cache is not None and not history:
+            cache_key, cached = await self._cache_lookup(request, ctx, mode, trace)
+            if cached is not None:
+                trace.annotate(model_called=False)
+                hit = cached.response
+                # 새 request_id·meta(시간, cache_hit=True, 모델을 부르지 않았으므로 토큰 None, 새 trace_id)를 채우고 세션 기록은 그대로 한다.
+                return await self._finish(
+                    request, ctx, mode, meta(cache_hit=True), hit.status, hit.answer, hit.reason, hit.citations,
+                    cached.final_context, trace=trace,
+                )
 
         try:
             active = trace.step(STEP_RETRIEVE, {"mode": mode.value, "k": self._k})
@@ -218,7 +244,8 @@ class BackendQAService:
                 reason = _EMPTY_REASON if not retrieved.chunks else _EMPTY_BUDGET_REASON
                 trace.annotate(model_called=False)
                 return await self._finish(
-                    request, ctx, mode, meta(), AnswerStatus.ABSTAINED, _EMPTY_ANSWER, reason, [], []
+                    request, ctx, mode, meta(), AnswerStatus.ABSTAINED, _EMPTY_ANSWER, reason, [], [],
+                    trace=trace, cache_key=cache_key,
                 )
 
             outcome = await generate_validated(
@@ -259,7 +286,59 @@ class BackendQAService:
             validated.reason,
             validated.citations,
             context.items,
+            trace=trace,
+            cache_key=cache_key,
         )
+
+    def _cache_key(self, request: QueryRequest, mode: RetrievalMode) -> str:
+        """답을 바꿀 수 있는 모든 입력의 해시(cache.py 모듈 docstring 의 목록). 인덱스 신원은 `retriever.index` 에서 읽는다."""
+        index = self._retriever.index
+        cfg = self._chain.config
+        return CacheKey(
+            question=normalize_question(request.question),
+            retrieval_mode=mode.value,
+            k=self._k,
+            index_name=index.index_name,
+            embedder_id=index.embedder_id,
+            fingerprint=index.fingerprint,  # 같은 이름으로 재색인하면 바뀐다: 옛 인덱스 기준 답변이 나가지 않게 한다
+            prompt_version=prompt_version(self._variant),
+            model=cfg.model,
+            reasoning_effort=cfg.reasoning_effort,
+            temperature=cfg.temperature,
+            context_max_tokens=context_max_tokens(),
+        ).digest()
+
+    async def _cache_lookup(
+        self, request: QueryRequest, ctx: RequestContext, mode: RetrievalMode, trace: RequestTrace
+    ) -> tuple[str | None, QAResult | None]:
+        """캐시를 읽는다. (저장에 쓸 키, 적중한 결과)를 돌려준다. 읽기에 실패하면 (None, None)이라 쓰기도 하지 않는다.
+
+        캐시는 부가 기능이라 실패해도 응답을 실패로 만들지 않는다. Redis 가 죽었을 때 timeout 을 두 번(읽기·쓰기) 치르지 않게
+        읽기에 실패하면 이번 요청에서는 쓰기도 건너뛴다.
+        """
+        assert self._cache is not None
+        step = trace.step(STEP_CACHE, {"mode": mode.value})
+        try:
+            key = self._cache_key(request, mode)
+            cached = await asyncio.to_thread(self._cache.get, key)  # 저장소가 동기 호출이라 이벤트 루프 밖에서 부른다
+        except Exception:  # noqa: BLE001 - 캐시 장애·키 구성 실패는 캐시 없이 처리한다
+            logger.warning("답변 캐시를 읽지 못해 캐시 없이 처리한다 request_id=%s", ctx.request_id, exc_info=True)
+            step.end(error="cache_unavailable")
+            trace.annotate(cache_error=True, cache_hit=False)
+            return None, None
+        if cached is not None and cached.response.status is AnswerStatus.ERROR:
+            cached = None  # 저장하지 않는 것이 원칙이지만, 들어 있어도 내보내지 않는다
+        step.end({"hit": cached is not None})
+        trace.annotate(cache_hit=cached is not None)
+        return key, cached
+
+    async def _cache_put(self, key: str, result: QAResult, ctx: RequestContext, trace: RequestTrace) -> None:
+        assert self._cache is not None
+        try:
+            await asyncio.to_thread(self._cache.put, key, result)
+        except Exception:  # noqa: BLE001 - 저장 실패가 답변 실패가 되지 않게 한다
+            logger.warning("답변 캐시에 저장하지 못했다 request_id=%s", ctx.request_id, exc_info=True)
+            trace.annotate(cache_write_error=True)
 
     async def _load_history(self, request: QueryRequest, ctx: RequestContext, trace: RequestTrace) -> list[HistoryTurn]:
         """같은 세션의 이전 대화를 읽는다. 세션이 없거나 멀티턴이 꺼져 있으면 빈 목록이다.
@@ -294,6 +373,9 @@ class BackendQAService:
         reason: str,
         citations: Sequence[Citation],
         items: Sequence[ContextItem],
+        *,
+        trace: RequestTrace,
+        cache_key: str | None = None,
     ) -> QAResult:
         resp = QueryResponse(
             request_id=ctx.request_id,
@@ -304,6 +386,9 @@ class BackendQAService:
             meta=meta,
         )
         if request.session_id:
+            # 기록을 단계로 감싼다: 저장소(DB·Redis)가 느려지거나 꺼졌을 때 그 지연이 trace 에 보이게 한다.
+            # (meta.latency_ms 는 이 기록 직전까지의 시간이고, root span 은 이 기록까지 포함한다.)
+            step = trace.step(STEP_SESSION, {"status": status.value})
             try:
                 turn = SessionTurn(
                     request_id=ctx.request_id,
@@ -318,4 +403,12 @@ class BackendQAService:
                 await asyncio.to_thread(self._sessions.append, request.session_id, turn)
             except Exception:  # noqa: BLE001 - 기록 실패가 답변 실패가 되지 않게 한다
                 logger.warning("세션 기록 실패 request_id=%s", ctx.request_id, exc_info=True)
-        return QAResult(response=resp, final_context=list(items))
+                step.end(error="session_record_failed")
+                trace.annotate(session_record_error=True)
+            else:
+                step.end({"recorded": True})
+        result = QAResult(response=resp, final_context=list(items))
+        # 캐시에 저장한다. 키가 있는 요청만(캐시를 쓰고, 이력이 없고, 읽기에 성공했고, 새로 만든 응답) 저장하고 error 는 저장하지 않는다.
+        if cache_key is not None and status is not AnswerStatus.ERROR:
+            await self._cache_put(cache_key, result, ctx, trace)
+        return result

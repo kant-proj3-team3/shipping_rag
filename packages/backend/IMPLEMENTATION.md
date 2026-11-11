@@ -17,8 +17,8 @@
 | G | Redis 세션 | 3 | 완료(#20) |
 | G2 | PostgreSQL 메시지 영구 저장 (계약 변경 동반) | 3 | 완료(#24). 계약은 #23(v0.1.1) |
 | G3 | 멀티턴(세션 이력을 프롬프트에 삽입) | 3 | 구현 완료(PR 대기). 계약은 #23 |
-| H | Redis 캐시 | 3 | 미착수 |
-| I | 라우터·`create_*` 진입점 | 4 | 미착수 |
+| H | Redis 캐시 | 3 | 완료(#26) |
+| I | 라우터·`create_*` 진입점 | 4 | 구현 완료(PR 대기). 실제 end-to-end도 확인했다 |
 | J | 답변 평가기 | 5 | 미착수 |
 | K | 보안 비교 지원 | 5 | 미착수 |
 
@@ -149,7 +149,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - [x] 실패한 요청도 `latency_ms`가 채워진다.
   - [x] 기존 목업과 같은 `QAService` 인터페이스를 만족한다(`runtime_checkable` 검사).
 - **구현 메모**
-  - `BackendQAService(retriever, chain, sessions, *, default_mode, k, variant)`. 협력 객체는 모두 주입받는다. 진입점 `create_qa_service`는 아직 목업을 돌려준다(전환은 I 단계).
+  - `BackendQAService(retriever, chain, sessions, *, default_mode, k, variant)`. 협력 객체는 모두 주입받는다. 진입점 `create_qa_service`는 `BACKEND_IMPL=real`일 때 이 서비스를 돌려준다(I 단계에서 연결).
   - 흐름: 검색 → `build_context`(예산은 `context_max_tokens()`) → 빈 문맥이면 모델 없이 `abstained` → `generate_validated` → 응답. 예산 때문에 문맥이 빈 경우도 같은 abstained이고 `reason`만 다르다.
   - 예외 매핑은 `error_code_for`가 한다. 목록에 없는 예외(`IngestError` 포함)는 `internal`이다. 사용자 문구·`reason`은 코드별 고정 문자열이고, 예외 메시지·스택은 서버 로그(`logger.warning`)에만 남긴다. `CancelledError` 같은 BaseException은 잡지 않는다.
   - 토큰: 정상·`output_invalid`는 확인된 합계(모르면 `None`), 모델 호출이 예외로 끝난 요청과 모델을 부르지 않은 요청은 `None`이다. `cost_usd`·`trace_id`는 `None`(F 이후 채운다).
@@ -184,7 +184,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 마스킹은 SDK의 `mask_otel_spans`(전송 직전, 문자열 속성)로 이메일·키를 가린다. 정규식 한계는 README에 적었다.
   - `cost_usd`는 `None`으로 둔다(서버 비용은 응답 시점에 모른다).
   - 환경변수: `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`(둘 다 있어야 켠다), 주소는 SDK가 `LANGFUSE_BASE_URL`·`LANGFUSE_HOST`를 모두 읽는다(`.env.example`은 `HOST`라 그대로 동작), `LANGFUSE_TRACING_ENABLED=false`로 끈다.
-  - `create_qa_service`(진입점)는 아직 목업이다. 실제 서비스에 `create_tracer()`를 주입하는 일은 I 단계에서 한다.
+  - 실제 서비스에 `create_tracer()`를 주입하는 일은 I 단계에서 했다(`BACKEND_IMPL=real`, `factory.py`).
   - 한계: 응답 `meta.trace_id`만으로는 서버에 저장됐는지 알 수 없다.
   - 실제 모델 확인에서 알게 된 것: ① Langfuse는 토큰을 세분해 보여 준다(입력 = 비캐시 + 캐시 생성, 출력 = 일반 + 추론). 합치면 응답 `meta`의 입출력 토큰과 같다(1,079/122 확인). 화면의 "input 3"은 비캐시분만이다. ② 구조화 출력을 쓰면 LangChain 내부 노드(`RunnableSequence`, `RunnableParallel`, `_check_refusal` 등)가 따로 기록돼 요청 하나가 observation 16개가 된다. 기능 문제는 아니고 화면 잡음이다. 걸러내려면 콜백에서 내부 노드를 제외하는 별도 작업이 필요하다(미정). ③ 서버가 계산한 비용(약 $0.0002)이 있지만 응답 `cost_usd`는 `None`으로 둔다.
 - **테스트**: `tests/test_tracing.py` — 가짜 트레이서(기록 항목, 검색 미발견↔문맥 축소 구분, 취소, 장애 격리), 실제 SDK를 메모리 exporter에 연결한 호출 형태 검증(같은 trace·부모 연결·이메일 마스킹·오류 level), `create_tracer` 분기, 마스킹. 실제 서버 연결은 수동 확인.
@@ -214,7 +214,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 장애: 기록 실패는 QAService가 삼키고(응답은 그대로), 조회 실패는 `None`(404)으로 바꾸지 않고 예외를 낸다. 이 경우 HTTP는 FastAPI 기본 500이며 계약에 맞는 `ApiError` 코드는 없다(필요하면 계약 변경 사항).
   - 동기 `redis` 클라이언트를 쓰고 `asyncio.to_thread`로 부른다. 그래서 `qa.py`의 `_finish`가 `async`가 됐다(기록 한 줄만 바뀜. `SessionRecorder` 프로토콜은 그대로라 목업 저장소도 동작한다). 멈춘 Redis가 이벤트 루프를 막지 않는지는 테스트로 확인한다(`to_thread`를 빼면 실패함을 확인).
   - 환경변수: `REDIS_URL`, `REDIS_TIMEOUT_S`(2), `SESSION_TTL_SECONDS`(86400), `SESSION_MAX_TURNS`(200). 기본값은 **임시**이며 팀이 정한다.
-  - 진입점 전환은 하지 않았다. `create_session_store()`가 저장소를 만들고, `create_qa_service`와 `create_session_service`가 이를 쓰게 하는 일은 I 단계다(둘이 서로를 인자로 받지 않으므로 각자 `create_session_store()`로 같은 Redis를 본다).
+  - 진입점 전환은 G에서 하지 않았고 I 단계에서 했다(`factory.shared_session_store()`가 `create_session_store()`로 저장소를 하나만 만들어 두 진입점이 공유한다).
   - 의존성: `redis>=5`(backend), 테스트용 `fakeredis`는 **루트** `pyproject.toml`의 dev 그룹에 넣었다(CI가 `uv sync --locked`로 루트 dev 그룹만 설치하므로. 서비스 이미지에는 들어가지 않는다).
 - **테스트**: `tests/test_session.py` — `fakeredis`(메모리)로 구조·순서·limit·TTL 갱신·조회 시 TTL 불변·만료·상한·읽을 수 없는 턴·잘못된 ID·bytes 클라이언트·QAService 연결·Redis 장애·이벤트 루프 비차단. 실제 Redis(compose)로도 한 번 확인했다: 기록·조회·TTL 86400·한글 왕복·같은 세션에 병렬 20건(전부 기록)·상한.
 
@@ -246,7 +246,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - [x] DB가 꺼져 있어도 `/query`가 정상 응답한다(실제 DB를 멈추고 확인: `answered`, 약 2.3초. 풀 timeout만큼 느려진다).
   - [x] 재시작 뒤에도 이력이 남는다(named volume `postgres_data`). 확인한 것은 컨테이너 재시작·정지/기동이고, 컨테이너를 지우는 `down` 뒤 재기동은 확인하지 못했다.
 - **테스트**: `tests/test_session_persistent.py`(메모리 가짜 DB + `fakeredis`: 쓰기 순서·무효화·채우기·보관 상한·Redis 만료 회귀·캐시/DB 장애 격리·`expires_at` 항상 None), `tests/test_session_db.py`(**실제 PostgreSQL**: 순서·limit·동시 기록 순번·읽을 수 없는 턴·새 풀로 재조회·동시 스키마 생성·접속 불가 시 빠른 실패. `TEST_DATABASE_URL`이 없으면 건너뛴다. CI에는 DB 서비스가 없어 CI에서는 돌지 않는다), `test_session.py`(질문 마스킹). 로컬 실행 방법은 README.
-- **알려진 한계**: DB가 오래 꺼져 있으면 요청마다 timeout만큼 늦어진다(차단기 없음). 조회가 DB를 읽는 사이 같은 세션에 기록이 들어오면 캐시가 한 턴 뒤처질 수 있다(다음 기록의 무효화나 TTL까지). 진입점 전환(`create_session_store`를 `create_qa_service`·`create_session_service`에 연결)은 I 단계다.
+- **알려진 한계**: DB가 오래 꺼져 있으면 요청마다 timeout만큼 늦어진다(차단기 없음). 조회가 DB를 읽는 사이 같은 세션에 기록이 들어오면 캐시가 한 턴 뒤처질 수 있다(다음 기록의 무효화나 TTL까지). 진입점 전환(`create_session_store`를 `create_qa_service`·`create_session_service`에 연결)은 I 단계에서 했다.
 
 ### G3. 멀티턴 (세션 이력을 프롬프트에 삽입)
 
@@ -267,7 +267,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - [x] 이력 조회가 실패해도 `/query`는 정상 응답한다(단발).
   - [x] 실제 PostgreSQL·Redis로 확인했다: 3번째 질문에 이전 2턴, Redis를 비운 뒤에도 DB에서 읽은 이전 3턴이 들어갔다.
 - **테스트**: `tests/test_history.py`(선택·예산·환경변수·읽기), `tests/test_prompts.py`(이전 대화 영역·규칙·버전·표식 위조 방어), `tests/test_multiturn.py`(QAService 흐름·되물음·턴 수·마스킹·끄기·다른 세션·장애 폴백·재생성·출처 검증·트레이스). 멀티턴을 끈 채 같은 테스트를 돌리면 이력을 기대하는 6개가 실패함을 확인했다.
-- **알려진 한계**: 검색은 원문 질문으로 하므로 **후속 질문·되물음에 대한 짧은 답은 검색이 빈약**해 `abstained`가 될 수 있다(이력은 모델의 이해만 돕는다). 질문 재작성이나 이전 질문을 검색어에 덧붙이는 방법은 측정해서 정한다. DB와 Redis 캐시가 모두 없으면 이력 읽기와 턴 기록이 각각 timeout을 기다려 요청이 두 배쯤 늦어진다(실제 약 4.3초). 이력 때문에 같은 질문이 세션마다 다른 답을 낼 수 있어 캐시는 이력이 있는 요청에서 우회해야 한다. 이력의 질문·답에 섞인 공격 문구는 규칙과 표식 무력화로만 막는다(실제 모델로 `security` 문항을 이력 경로에 흘려 보지는 못했다). 진입점 연결(`create_qa_service`에 `history=` 주입)은 I 단계다. 목업은 이력을 쓰지 않는다.
+- **알려진 한계**: 검색은 원문 질문으로 하므로 **후속 질문·되물음에 대한 짧은 답은 검색이 빈약**해 `abstained`가 될 수 있다(이력은 모델의 이해만 돕는다). 질문 재작성이나 이전 질문을 검색어에 덧붙이는 방법은 측정해서 정한다. DB와 Redis 캐시가 모두 없으면 이력 읽기와 턴 기록이 각각 timeout을 기다려 요청이 두 배쯤 늦어진다(실제 약 4.3초). 이력 때문에 같은 질문이 세션마다 다른 답을 낼 수 있어 캐시는 이력이 있는 요청에서 우회해야 한다. 이력의 질문·답에 섞인 공격 문구는 규칙과 표식 무력화로만 막는다(실제 모델로 `security` 문항을 이력 경로에 흘려 보지는 못했다). 진입점 연결(`create_qa_service`에 `history=` 주입)은 I 단계에서 했다. 목업은 이력을 쓰지 않는다.
 
 ### H. Redis 캐시 (선택)
 
@@ -277,12 +277,24 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 세션 이력을 프롬프트에 쓰면 이력을 키에 넣거나 그 요청은 캐시를 우회한다.
   - 적중이어도 같은 스키마, `meta.cache_hit=True`. 캐시에는 `status=error` 응답을 저장하지 않는다.
   - 환경변수로 끌 수 있어야 한다(평가 실행 중 지표 왜곡 방지).
-- **파일**: `src/backend/cache.py`
+- **파일**: `src/backend/cache.py`(키·저장소·환경변수), `qa.py`(조회·저장·적중 응답), `tracing.py`(`STEP_CACHE`), `session.py`(`create_redis_client` 공개)
+- **구현에서 정한 것**
+  - [x] **키**: 사양의 목록에 **모델·추론 강도·temperature, 문맥 토큰 예산, 저장 형식 버전**을 더했다(바뀌면 같은 질문도 답이 달라진다). 질문은 앞뒤 공백을 지우고 유니코드 NFC로 맞춘다. 키는 `rag:answer:` + 해시이고 세션 키 공간과 분리한다.
+  - [x] **이력 우회**: 이력이 프롬프트에 실제로 들어가는 요청(`history`가 비어 있지 않음)은 읽지도 쓰지도 않는다(키에 이력을 넣으면 사실상 적중하지 않는다). 세션이 있어도 이력이 비어 있는 첫 질문은 쓴다.
+  - [x] **적중 응답**: 새 `request_id`·`trace_id`·`latency_ms`, `cache_hit=True`, **토큰은 `None`**(이번 요청에서 모델을 부르지 않았다. 0으로 채우면 평균이 왜곡된다). 평가 입력(`final_context`)도 함께 저장해 같은 스키마로 돌려준다. **적중해도 세션 기록은 한다.**
+  - [x] **저장 대상**: `status=error`는 저장하지 않는다. `abstained`(근거 없음)와 `needs_clarification`은 저장한다.
+  - [x] **TTL**: 기본 1시간(`CACHE_TTL_SECONDS`, 임시). 모든 키에 TTL이 있다.
+  - [x] **끄기**: `CACHE_ENABLED=false`(기본은 켜짐). 평가를 돌릴 때는 꺼야 한다. 적중 여부는 `meta.cache_hit`으로 알 수 있다.
+  - [x] **장애 격리**: 읽기·쓰기가 실패해도 캐시 없이 응답한다. 읽기에 실패하면 쓰기를 건너뛴다(Redis가 죽었을 때 timeout을 두 번 치르지 않게). 읽을 수 없는 항목은 없는 것으로 보고 덮어쓴다.
+  - [x] **캐시 전용 timeout**: 캐시 Redis는 `CACHE_TIMEOUT_S`(기본 0.5초)를 따로 쓴다. 실제로 Redis를 멈추고 재 보니 `localhost` 기준 조회 실패가 4.1초 걸렸고, 짧은 timeout과 `127.0.0.1`로 0.5초가 됐다. **원인은 재시도가 아니라 `localhost`의 이중 스택 해석**(IPv6·IPv4를 차례로 시도)이다: timeout 0.5초일 때 `localhost` 1.05초, `127.0.0.1` 0.51초, `[::1]` 0.52초로 확인했고 재시도를 꺼도 같았다.
 - **완료 기준**
-  - [ ] 재색인으로 `fingerprint`가 바뀌면 옛 답변이 나가지 않는다.
-  - [ ] 프롬프트 버전이 바뀌면 적중하지 않는다.
-  - [ ] 캐시를 끄면 항상 새로 생성한다.
-  - [ ] 오류 응답이 캐시되지 않는다.
+  - [x] 재색인으로 `fingerprint`가 바뀌면 옛 답변이 나가지 않는다(`test_reindexing_the_same_name_does_not_serve_old_answers`).
+  - [x] 프롬프트 버전이 바뀌면 적중하지 않는다. 모델·추론 강도·temperature·검색 방식도 마찬가지다.
+  - [x] 캐시를 끄면 항상 새로 생성한다(`cache=None`, `CACHE_ENABLED=false`).
+  - [x] 오류 응답이 캐시되지 않는다.
+  - [x] 실제 Redis(compose)로 확인했다: 미적중 → 적중(모델 1회 호출), 키 1개·접두사 `rag:answer:`·TTL 3,600초·세션 키 침범 없음, Redis를 멈추면 응답은 정상이고 0.5초가 걸린다.
+- **테스트**: `tests/test_cache.py`(키의 모든 구성 요소가 키를 바꾼다, 적중 스키마, 재색인·프롬프트·모델·검색 방식 변경 시 비적중, 오류 미저장, 이력 우회, 적중해도 세션 기록, 트레이스, 읽기·쓰기 실패 격리, 깨진·옛 항목, TTL·접두사). 핵심 동작 5가지(fingerprint 제외, 이력 우회 제거, 읽기 실패 뒤 쓰기, error 저장, 프롬프트 버전 제외)를 일부러 깨뜨리면 각각 테스트가 1개씩 실패함을 확인했다.
+- **알려진 한계**: 모델이 매번 같은 답을 내지는 않는다(추론 모델). 캐시는 그중 하나를 TTL 동안 고정하므로 잘못된 답이 한 번 저장되면 TTL 동안 반복된다. 이력이 있는 요청은 우회하므로 효과는 같은 첫 질문이 반복될 때뿐이다. 세션 저장소의 Redis(`REDIS_TIMEOUT_S` 2초)는 `localhost`에서 실패 시 4초가 걸린다(이 PR에서 바꾸지 않았다). 진입점 연결은 I 단계에서 했다(`factory.py`: 실제 모드의 `create_qa_service`가 `CACHE_ENABLED`가 꺼져 있지 않으면 `create_answer_cache()`를 주입한다).
 
 ---
 
@@ -294,15 +306,26 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
 - **내용**
   - `GET /health`: `index_ready`, `index_name`, `embedder_id`, `supported_modes`.
   - `POST /query`: Pydantic 검증(빈 질문·미지원 모드는 요청 검증 오류), `request_id`는 서버가 생성. 처리 결과의 HTTP 상태는 `common.api.ERROR_HTTP_STATUS` 매핑을 따른다. 답변의 정확성과 HTTP 상태는 별개다.
-  - `GET /session/{id}`: 없거나 만료면 404 + `ApiError`.
+  - `GET /session/{id}`: 한 번도 기록되지 않은 세션이면 404 + `ApiError`(세션은 만료되지 않는다).
   - 진입점: `create_qa_service(retriever)`, `create_session_service()`, `create_answer_evaluator(embedder)`, `create_router(qa_service, session_service, index)`. `common.entrypoints` 시그니처와 맞춘다.
   - `src/backend/__init__.py`에서 진입점을 노출하고, 목업 모드(`mock/`)와 실제 구현의 전환 방식은 README에 적는다.
-- **파일**: `src/backend/router.py`, `src/backend/__init__.py`
+- **파일**: `src/backend/router.py`(이전 단계에서 구현), `src/backend/__init__.py`(진입점·전환), `src/backend/factory.py`(실제 구현 조립·지연 생성 체인)
+- **구현에서 정한 것**
+  - [x] **전환 방식**: `BACKEND_IMPL=real`이면 실제 구현, 없거나 `mock`이면(기본) 목업. retrieval·chunking의 `*_IMPL`과 같은 방식이고, 기본이 목업이라 키·DB 없는 개발 환경과 CI가 그대로 동작한다. 답변 평가기는 J 전까지 항상 목업이다.
+  - [x] **세션 저장소 공유**: 두 진입점이 서로를 인자로 받지 않으므로 `factory.shared_session_store()`(프로세스 안에서 하나)로 DB 풀·Redis 연결이 두 벌이 되지 않게 한다. QA 서비스는 이 저장소를 `sessions`와 `history`로 함께 받는다(멀티턴).
+  - [x] **트레이서**: `create_tracer()`(키가 없으면 기록 없이 동작)를 주입한다.
+  - [x] **OpenAI 키가 없을 때**: 모델 클라이언트(`ChatOpenAI`)를 **앱 시작 때 미리 만들어 보고**(`warm_up`) 실패하면 첫 요청 때 다시 시도한다(`LazyAnswerChain`). 키가 없어도 앱(`/health`)은 뜨고 그 요청만 `model_failed`(502)로 돌려준다. 미리 만드는 이유: 실제 실행의 trace에서 첫 요청에만 `build-context`와 `generate-answer` 사이에 약 1.1초 공백이 있었고, 새 프로세스에서 재 보니 클라이언트 생성이 약 0.75초였다(나머지 약 0.35초는 원인을 확인하지 못했다). 원인은 서버 로그에만 남기고(첫 번째만 스택) 사용자 응답에는 넣지 않는다. 검색 결과가 없어 모델을 부르지 않는 요청은 키 없이도 `abstained`(200)다.
+  - [x] **체인 인터페이스**: `validate.py`·`qa.py`가 구체 클래스 대신 `AnswerGenerator`(`config`+`generate`)를 받는다(`AnswerChain`과 지연 생성 체인이 만족).
+  - [x] **세션 404 문구**: 계약 예시(`session_not_found.json`)와 같은 "세션을 찾을 수 없습니다."로 고쳤다(만료가 없다).
+  - [x] **세션 기록 단계(`record-session`)**: 세션 기록을 trace의 단계로 감싼다(`session_id`가 있을 때만, 실패하면 ERROR + `session_record_error` 메타). 정상일 때는 수 ms라 실제 실행에서 안 보였지만, 저장소가 느려지거나 꺼졌을 때의 지연(timeout만큼)이 어느 단계에도 안 잡히던 구조적 공백을 막는다. `meta.latency_ms`는 기존 결정대로 기록 직전까지의 시간이고 root span은 기록까지 포함한다(바꾸지 않았다).
+  - [x] **답변 캐시 연결(H)**: 실제 모드의 `create_qa_service`는 `CACHE_ENABLED`(기본 켜짐)가 `false`·`0`·`no`·`off`가 아니면 `create_answer_cache()`를 주입한다. 연결은 첫 사용 때 만들어져 Redis가 없어도 앱은 뜨고, 캐시를 못 읽으면 캐시 없이 응답한다. 인자로는 "안 줌 = 환경변수를 따른다, `None` = 명시적으로 끈다, 객체 = 그것을 쓴다"를 구분한다. **평가를 돌릴 때는 꺼야 한다.** 테스트가 개발자 PC의 실제 Redis에 붙어 서로 영향을 주지 않도록 테스트는 캐시를 명시적으로 끄거나 메모리 Redis를 주입한다(처음에는 기본값이 켜져 있어 라우터 테스트 10개가 실제 Redis의 캐시를 공유하며 실패했다. 전체 테스트를 돌린 뒤 실제 Redis에 답변 캐시 키가 0개 남는 것을 확인했다).
 - **완료 기준**
-  - [ ] TestClient로 정상 / 빈 질문 / 근거 부족 / 모델 오류(모의)가 구분된다.
-  - [ ] `scripts/export_openapi.py` 결과가 `contracts/openapi.json`과 같다.
-  - [ ] `/docs`에서 한 질문을 end-to-end로 실행해 본다(`app` 조립 필요, 변경이 필요하면 사람에게 알린다).
-- **테스트**: `tests/test_router.py`(TestClient + 모의 QA 서비스).
+  - [x] TestClient로 정상 / 빈 질문(422) / 근거 부족(200 abstained, 모델 미호출) / 모델 오류·시간 초과·출력 검증 실패(502·504) / 검색 실패·인덱스 미준비·입력 한도(502·503·400) / 예상 못 한 오류(500)가 구분된다(실제 `BackendQAService` + 가짜 LLM).
+  - [x] `scripts/export_openapi.py` 결과가 `contracts/openapi.json`과 같다(의미상 동일. 바이트 비교는 이전부터 줄바꿈 차이로 다르다). 실제 라우터의 OpenAPI도 `app/tests`가 계약과 비교한다.
+  - [x] **실제 end-to-end 실행**: Qdrant + `CHUNKING_IMPL=real` 색인(GPU, 문서 50개·청크 15,053개, 약 6분: 파싱 3분 7초·임베딩 2분 10초)을 만들고, 세 `*_IMPL=real`로 api를 띄워(`/health` `index_ready=true`, 임베더 ID 일치) 평가 질문으로 확인했다. 질문 3개가 정답과 일치하고 출처가 붙었으며, 같은 세션의 후속 질문에는 이전 대화가 들어갔고(입력 토큰 +265), 세션은 PostgreSQL에 저장됐고, Langfuse trace가 도착해 `load-history`·`retrieve`·`build-context`·`generate-answer` 구조를 확인했다. `app/`은 수정하지 않았다. 확인 뒤 만든 테스트 세션은 지웠다.
+  - **실제 실행에서 알게 된 것**: (1) 기본 검색 방식 `hybrid`가 한 질문(IS-DEV-05 유형)에서 근거(IS08 1쪽)를 놓쳤고 `naive`와 `hybrid_rerank`는 맞혔다. **질문 하나라 일반화할 수 없다**: 검색 방식 비교는 `cli eval`로 전체 문항을 같은 조건에서 해야 한다. (2) 같은 질문이 실행마다 다른 status를 냈다(추론 모델): 평가 때는 `LLM_REASONING_EFFORT=none`과 `LLM_TEMPERATURE=0`으로 고정한다. (3) 첫 요청에만 있던 1.1초 공백은 모델 클라이언트 사전 생성(warm-up)으로 없앴다. (4) 루트 `.env`의 `INDEX_NAME`이 예시의 자리표시자(`rag-dev-<본인이름>`)라 컬렉션 이름으로 쓸 수 없다. (5) Windows에서 `uv`가 설치하는 torch는 CPU 빌드라 GPU를 쓰려면 CUDA 빌드를 따로 설치해야 하고(`uv pip install --torch-backend=auto`), 그 뒤에는 `uv run --no-sync`를 써야 되돌려지지 않는다.
+- **테스트**: `tests/test_router.py`(실제 QAService + 가짜 LLM·메모리 Redis·가짜 DB로 HTTP 계약 전체: 상태 코드 매핑, 422 검증, 세션 조회·404·500, 마스킹, HTTP 멀티턴. 에러 매핑을 일부러 깨뜨리면 8개가 실패함을 확인했다), `tests/test_factory.py`(`BACKEND_IMPL` 전환, 세션 저장소 공유, 조립은 연결하지 않음, 키 없는 `/query`, 지연 생성 체인).
+- **알려진 한계**: 앱 종료 때 Langfuse flush·DB 풀 닫기를 하는 수명주기 훅은 없다(`app/api.py` 소관이라 건드리지 않았다. Langfuse SDK는 종료 때 자체 정리를 한다). `k`·기본 검색 방식은 `BackendQAService`의 기본값(5, hybrid)을 쓰고 환경변수로 바꿀 수 없다.
 
 ---
 

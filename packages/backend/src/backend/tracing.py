@@ -6,9 +6,14 @@
 한 요청은 trace 하나가 되고, 안에 단계(observation)가 트리로 달린다::
 
     qa-query                         root span  입력=질문, 출력=status·answer·citations, 메타=request_id·토큰·시간·오류 코드
+      ├─ load-history                (session_id 가 있고 멀티턴이 켜졌을 때) 이전 대화 개수. 본문은 넣지 않는다
       ├─ retrieve                    검색 결과: rank·score·chunk_id (전부)
       ├─ build-context               예산 적용 전후: 검색된 chunk_id ↔ 최종 문맥(S번호↔chunk_id) ↔ 제외된 chunk_id
-      └─ generate-answer             LangChain CallbackHandler 가 만든 단계(ChatOpenAI GENERATION 에 실제 모델 입출력·토큰)
+      ├─ generate-answer             LangChain CallbackHandler 가 만든 단계(ChatOpenAI GENERATION 에 실제 모델 입출력·토큰)
+      └─ record-session              (session_id 가 있을 때) 세션 저장소(DB·Redis) 기록. 실패하면 ERROR 로 닫힌다
+
+record-session 이 따로 있는 이유: 저장소가 느려지거나 꺼졌을 때(timeout 만큼 요청이 늦어진다) 그 지연이 어느 단계에도 안 잡히면
+원인을 찾기 어렵다. 정상일 때는 수 ms 다. `meta.latency_ms` 는 이 기록 직전까지의 시간이고 root span 은 기록까지 포함한다.
 
 "검색에서 못 찾음"과 "문맥 축소 중 빠짐"은 retrieve 와 build-context 를 나란히 보면 구분된다
 (검색 결과에는 있는데 dropped_chunk_ids 에 있으면 문맥 축소, 처음부터 없으면 검색 단계 문제).
@@ -54,6 +59,8 @@ ROOT_NAME = "qa-query"
 STEP_RETRIEVE = "retrieve"
 STEP_CONTEXT = "build-context"
 STEP_HISTORY = "load-history"  # 멀티턴: 세션 이력을 읽어 프롬프트에 넣을 이전 대화를 고르는 단계
+STEP_CACHE = "cache-lookup"  # 답변 캐시 조회. 적중하면 검색·모델 호출 단계는 생기지 않는다(이력이 있는 요청은 우회해서 이 단계도 없다)
+STEP_SESSION = "record-session"  # 끝난 질의응답을 세션 저장소(DB·Redis)에 기록하는 단계. session_id 가 있을 때만 생긴다
 
 
 # ── 공개 인터페이스 ───────────────────────────────────────────────────
@@ -446,7 +453,9 @@ __all__ = [
     "create_tracer",
     "guard",
     "redact",
+    "STEP_CACHE",
     "STEP_HISTORY",
+    "STEP_SESSION",
     "summarize_context",
     "summarize_history",
     "summarize_response",
