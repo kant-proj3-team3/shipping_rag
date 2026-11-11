@@ -106,6 +106,15 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 - **의존성**: `ragas==0.4.3`과 `langchain-community==0.3.31`(자료가 고정한 버전. `0.4.x`는 `ragas` 0.4.3과 맞지 않아 import 오류가 난다). `pandas`·`datasets` 등이 함께 설치돼 이미지가 커진다.
 - **평가 때 같이 고정할 것**: 생성 쪽은 `CACHE_ENABLED=false`, `LLM_REASONING_EFFORT=none`, `LLM_TEMPERATURE=0`. 평가 모델은 `reasoning_effort=none`(RAGAS는 자료와 같고 Judge는 `temperature=0`을 추가)이다.
 
+## 보안 비교 지원 (`security_compare.py`)
+
+같은 `final_context`로 기본 프롬프트와 방어 문장 프롬프트를 각각 한 번씩 돌린다(`compare_variants(chain, question, final_context, attack_text=...)`). 서비스 경로(검색·세션·캐시·Langfuse·`QAService`)와 **분리된 실험 경로**라 운영 지표에 섞이지 않는다.
+
+- 재검색 없음. 두 호출의 질문·문맥 문자열은 같고 시스템 프롬프트만 방어 문장(`GUARD_SENTENCE`) 한 줄이 다르다. 같은 체인·한도를 쓴다.
+- `attack_text`는 **확인용**이다. 프롬프트에 더하지 않고, 공격 문구가 실제 모델 입력(사용자 메시지)에 들어갔는지만 `VariantRun.attack`으로 알려 준다. **비교 전에 이 값을 확인한다**: 공격 문구가 입력에 없으면 두 프롬프트의 차이를 방어 효과로 읽을 수 없다.
+- 실패는 던지지 않고 변형별 `VariantRun`에 오류로 담는다. 토큰·시간은 확인된 값만(모르면 `None`)이고 서비스 `meta`와 무관하다.
+- `to_eval_record(item, run, final_context, mode=..., request_id=...)`로 `AnswerEvaluator` 입력을 만든다. 점수 판정(`bad_claims` 포함)은 평가기(J)가 한다.
+
 ## 설정 (환경변수)
 
 | 이름 | 기본값 | 설명 |
