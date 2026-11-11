@@ -10,6 +10,7 @@ dependencies = [
     "backend",
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    "torch>=2.4",   # 직접 의존성으로 선언해야 아래 [tool.uv.sources] 의 torch 설정이 적용된다 (sentence-transformers 가 가져오는 그 torch)
 ]
 
 [dependency-groups]
@@ -35,6 +36,14 @@ common = { workspace = true }
 chunking = { workspace = true }
 retrieval = { workspace = true }
 backend = { workspace = true }
+# Windows 의 PyPI torch 는 CPU 전용이라 임베더·리랭커가 GPU 를 쓰지 못한다. Windows 에서만 CUDA 12.8 빌드를 쓴다.
+# Linux(Docker 이미지 포함)와 macOS 는 PyPI 의 torch 를 그대로 쓴다.
+torch = { index = "pytorch-cu128", marker = "sys_platform == 'win32'" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true   # 위 sources 에서 지정한 패키지(torch)에만 쓴다
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "app"]
