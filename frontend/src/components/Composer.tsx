@@ -76,6 +76,9 @@ export function Composer({
   /** Safari 는 compositionend 가 keydown 보다 먼저 와서 합성을 끝낸 Enter 가 isComposing=false 로 들어온다 */
   const justComposedRef = useRef(false);
   const canSend = !isBusy && !isDisabled && value.trim() !== "";
+  const keyHint = isTouch ? TOUCH_HINT : KEYBOARD_HINT;
+  // 입력창 아래 안내. 보낼 수 없는 이유(hint)는 늘 보이고, 키 사용법은 실행 취소 안내가 있으면 자리를 내준다
+  const baseHint = hint ?? (onUndoReplace ? undefined : keyHint);
 
   useLayoutEffect(() => {
     fitHeight(textareaRef);
@@ -166,20 +169,21 @@ export function Composer({
         )}
       </div>
       <div className="mt-1.5 flex justify-between gap-4 px-2 text-xs text-zinc-500">
-        {onUndoReplace ? (
-          <span role="status" className="flex min-w-0 items-center gap-2">
-            <span className="truncate">입력하던 글을 바꿨습니다</span>
-            <button
-              type="button"
-              onClick={onUndoReplace}
-              className="shrink-0 font-medium text-zinc-700 underline underline-offset-2 dark:text-zinc-300"
-            >
-              실행 취소
-            </button>
-          </span>
-        ) : (
-          <span>{hint ?? (isTouch ? TOUCH_HINT : KEYBOARD_HINT)}</span>
-        )}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          {baseHint !== undefined ? <span>{baseHint}</span> : null}
+          {onUndoReplace ? (
+            <span role="status" className="flex min-w-0 items-center gap-2">
+              <span className="truncate">입력하던 글을 바꿨습니다</span>
+              <button
+                type="button"
+                onClick={onUndoReplace}
+                className="shrink-0 font-medium text-zinc-700 underline underline-offset-2 dark:text-zinc-300"
+              >
+                실행 취소
+              </button>
+            </span>
+          ) : null}
+        </div>
         <span id={countId} className="shrink-0 tabular-nums">
           {value.length} / {MAX_QUESTION_LENGTH}
         </span>
