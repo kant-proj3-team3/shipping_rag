@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useMediaQuery } from "./useMediaQuery";
 import { useStorage } from "./useStorage";
+import { useStorageChange } from "./useStorageChange";
 import { THEME_STORAGE_KEY } from "../lib/config";
 import { THEMES, type Theme } from "../lib/labels";
 import { readItem, writeItem, type KeyValueStorage } from "../lib/storage";
@@ -18,7 +19,7 @@ function readTheme(storage: KeyValueStorage): Theme {
 }
 
 /**
- * 화면 테마 (시스템 · 라이트 · 다크). 고른 값은 저장소에 남긴다.
+ * 화면 테마 (시스템 · 라이트 · 다크). 고른 값은 저장소에 남기고, 다른 탭에서 바꾸면 따라 바꾼다.
  * <html> 에 dark 클래스와 color-scheme(스크롤바 · 폼 요소 색)을 맞추고, "시스템"이면 OS 설정이 바뀌는 대로 따라간다.
  * 처음 그리기 전에는 index.html 의 스크립트가 같은 규칙으로 붙인다
  */
@@ -33,6 +34,10 @@ export function useTheme(): UseThemeResult {
     root.classList.toggle("dark", isDark);
     root.style.colorScheme = isDark ? "dark" : "light";
   }, [isDark]);
+
+  // 다른 탭이 테마를 바꾸면 따라 바꾼다
+  const followOtherTab = useCallback(() => setTheme(readTheme(storage)), [storage]);
+  useStorageChange(THEME_STORAGE_KEY, followOtherTab);
 
   function selectTheme(next: Theme): void {
     setTheme(next);
