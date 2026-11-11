@@ -25,7 +25,8 @@
 - `meta.latency_ms` 는 수신~반환 전체이고 실패에도 채운다. 토큰은 확인된 값만(모르면 None).
   모델 호출이 예외로 끝난 요청은 응답을 받지 못해 토큰을 알 수 없으므로 None 이다.
 - 세션 기록 실패는 응답을 실패로 만들지 않는다(기록만 건너뛴다). 세션 이력 조회 실패도 마찬가지로 이력 없이 단발로 답한다.
-- 멀티턴은 이전 대화를 프롬프트에만 넣는다. 검색은 원문 질문으로 하고, 검색 자료(`final_context`)에는 이력이 들어가지 않는다.
+- 멀티턴은 이전 대화를 프롬프트에 넣는다. 검색은 이번 질문 원문으로 하되, 직전 턴(들)이 되묻기였다면 그 질문들을 앞에 붙인 검색어로 한다
+  (history.py 참고). 프롬프트의 질문은 항상 원문이고, 검색 자료(`final_context`)에는 이력이 들어가지 않는다.
 - 답변 캐시(H)는 부가 기능이다. 읽기·쓰기가 실패해도 캐시 없이 처리한다(읽기에 실패하면 쓰기도 시도하지 않는다). 이력이 프롬프트에 들어가는
   요청은 읽지도 쓰지도 않는다. 적중해도 세션 기록은 한다. 적중한 응답은 `meta.cache_hit=True` 이고 이번 요청에서 모델을 부르지 않았으므로
   토큰은 None 이다. `status=error` 는 저장하지 않는다. 자세한 키 구성은 cache.py 모듈 docstring 참고.
@@ -45,8 +46,8 @@ from typing import Protocol
 from backend.cache import AnswerCache, CacheKey, normalize_question
 from backend.chain import AnswerGenerator, ModelCallError, ModelTimeoutError
 from backend.context import ContextBuild, build_context, context_max_tokens
-from backend.history import HistorySource, history_max_turns, load_history
-from backend.prompts import HistoryTurn, PromptVariant, prompt_version
+from backend.history import Conversation, HistorySource, build_search_query, history_max_turns, load_conversation
+from backend.prompts import PromptVariant, prompt_version
 from backend.tracing import (
     STEP_CACHE,
     STEP_CONTEXT,
@@ -208,11 +209,14 @@ class BackendQAService:
             )
             return QAResult(response=resp, final_context=final_context())  # 오류는 세션에 기록하지 않는다
 
-        history = await self._load_history(request, ctx, trace)  # 실패해도 예외 없이 빈 이력이다
+        conversation = await self._load_history(request, ctx, trace)  # 실패해도 예외 없이 빈 이력이다
+        history = conversation.history
+        # 직전이 되묻기였다면 그 질문들을 붙여 검색한다. 아니면 이번 질문 그대로다(프롬프트의 질문은 항상 원문).
+        search_query = build_search_query(request.question, conversation.prior_questions)
 
-        # 답변 캐시. 이력이 프롬프트에 들어가는 요청은 같은 질문이라도 답이 달라지므로 읽지도 쓰지도 않는다.
+        # 답변 캐시. 이력이 프롬프트에 들어가거나 검색어가 이전 질문으로 바뀐 요청은 같은 질문이라도 답이 달라지므로 읽지도 쓰지도 않는다.
         cache_key: str | None = None
-        if self._cache is not None and not history:
+        if self._cache is not None and not history and not conversation.prior_questions:
             cache_key, cached = await self._cache_lookup(request, ctx, mode, trace)
             if cached is not None:
                 trace.annotate(model_called=False)
@@ -224,9 +228,13 @@ class BackendQAService:
                 )
 
         try:
-            active = trace.step(STEP_RETRIEVE, {"mode": mode.value, "k": self._k})
+            retrieve_input: dict[str, object] = {"mode": mode.value, "k": self._k}
+            if search_query != request.question:  # 되묻기 질문을 붙인 경우만 표시한다(질문 본문은 넣지 않는다)
+                retrieve_input["clarification_questions"] = len(conversation.prior_questions)
+                trace.annotate(search_query_expanded=True)
+            active = trace.step(STEP_RETRIEVE, retrieve_input)
             retrieved = await self._retriever.retrieve(
-                RetrievalRequest(query=request.question, mode=mode, k=self._k), ctx
+                RetrievalRequest(query=search_query, mode=mode, k=self._k), ctx
             )
             active.end(summarize_retrieved(retrieved.chunks))
 
@@ -340,27 +348,27 @@ class BackendQAService:
             logger.warning("답변 캐시에 저장하지 못했다 request_id=%s", ctx.request_id, exc_info=True)
             trace.annotate(cache_write_error=True)
 
-    async def _load_history(self, request: QueryRequest, ctx: RequestContext, trace: RequestTrace) -> list[HistoryTurn]:
-        """같은 세션의 이전 대화를 읽는다. 세션이 없거나 멀티턴이 꺼져 있으면 빈 목록이다.
+    async def _load_history(self, request: QueryRequest, ctx: RequestContext, trace: RequestTrace) -> Conversation:
+        """같은 세션의 이전 대화를 읽는다. 세션이 없거나 멀티턴이 꺼져 있으면 빈 대화다.
 
         이력은 답변을 돕는 부가 정보라서 읽기에 실패해도 응답을 실패로 만들지 않고 이력 없이(단발로) 답한다.
         """
         if self._history is None or not request.session_id:
-            return []
+            return Conversation()
         max_turns = history_max_turns()
         if max_turns <= 0:
-            return []
+            return Conversation()
         step = trace.step(STEP_HISTORY, {"max_turns": max_turns})
         try:
-            history = await load_history(self._history, request.session_id, max_turns=max_turns)
+            conversation = await load_conversation(self._history, request.session_id, max_turns=max_turns)
         except Exception:  # noqa: BLE001 - 이력을 못 읽어도 단발로 답한다
             logger.warning("세션 이력을 읽지 못해 단발로 답한다 request_id=%s", ctx.request_id, exc_info=True)
             step.end(error="history_unavailable")
             trace.annotate(history_error=True, history_turns=0)
-            return []
-        step.end(summarize_history(len(history), max_turns))
-        trace.annotate(history_turns=len(history))
-        return history
+            return Conversation()
+        step.end(summarize_history(len(conversation.history), max_turns))
+        trace.annotate(history_turns=len(conversation.history))
+        return conversation
 
     async def _finish(
         self,
