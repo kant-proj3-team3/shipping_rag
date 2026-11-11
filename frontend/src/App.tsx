@@ -137,8 +137,9 @@ export function App() {
               ☰
             </button>
           ) : null}
-          {/* 제목과 함께 좁은 화면에서는 숨긴다 (머리줄이 두 줄로 늘어난다) */}
-          <SealMascot className="size-8 shrink-0 max-md:hidden" />
+          {/* 제목과 함께 좁은 화면에서는 숨긴다 (머리줄이 두 줄로 늘어난다). 마우스를 올리면 손을 흔들고 반짝이며 눈을 깜박인다.
+              32px 로 그리면 선이 굵고 흐려 보여 40px 로 그리고, 물개가 숨는 좁은 화면과 머리줄 높이가 같도록 음수 여백을 둔다 */}
+          <SealMascot motion="hover" isSubtle className="-my-1 size-10 shrink-0 max-md:hidden" />
           {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
           <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
