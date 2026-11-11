@@ -5,8 +5,8 @@
 - "real": 실제 QA 서비스(검색 → 문맥 → 모델 → 검증, Langfuse 기록)와 PostgreSQL+Redis 세션. 자세한 내용은 `factory.py`.
 
 create_qa_service 와 create_session_service 는 인자로 서로를 받지 않으므로 같은 프로세스 안에서 세션 저장소를 공유한다
-(목업은 메모리 저장소, 실제 구현은 PostgreSQL 원본 + Redis 캐시 하나). 답변 평가기(`create_answer_evaluator`)는 J 단계 전까지
-`BACKEND_IMPL` 과 상관없이 목업이다.
+(목업은 메모리 저장소, 실제 구현은 PostgreSQL 원본 + Redis 캐시 하나). 답변 평가기(`create_answer_evaluator`)도 같은 방식이다:
+`real` 이면 RAGAS Faithfulness + Judge(`evaluator.py`), 아니면 목업.
 """
 
 from __future__ import annotations
@@ -47,6 +47,11 @@ def create_session_service() -> SessionService:
 
 
 def create_answer_evaluator(embedder: Embedder | None) -> AnswerEvaluator:
+    if _use_real():
+        # RAGAS·모델 클라이언트는 평가기가 처음 쓰일 때 만들어지므로 키가 없어도 앱은 뜬다
+        from .evaluator import create_evaluator
+
+        return create_evaluator(embedder)
     return MockAnswerEvaluator(embedder)
 
 

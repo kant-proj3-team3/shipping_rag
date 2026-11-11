@@ -16,10 +16,10 @@
 | F | Langfuse 트레이싱 | 2 | 완료(#18) |
 | G | Redis 세션 | 3 | 완료(#20) |
 | G2 | PostgreSQL 메시지 영구 저장 (계약 변경 동반) | 3 | 완료(#24). 계약은 #23(v0.1.1) |
-| G3 | 멀티턴(세션 이력을 프롬프트에 삽입) | 3 | 구현 완료(PR 대기). 계약은 #23 |
+| G3 | 멀티턴(세션 이력을 프롬프트에 삽입) | 3 | 완료(#25). 계약은 #23 |
 | H | Redis 캐시 | 3 | 완료(#26) |
-| I | 라우터·`create_*` 진입점 | 4 | 구현 완료(PR 대기). 실제 end-to-end도 확인했다 |
-| J | 답변 평가기 | 5 | 미착수 |
+| I | 라우터·`create_*` 진입점 | 4 | 완료(#27). 실제 end-to-end도 확인했다 |
+| J | 답변 평가기 | 5 | 구현 완료(PR 대기). 실제 모델로 4건 확인 |
 | K | 보안 비교 지원 | 5 | 미착수 |
 
 상태 값: `미착수` / `진행 중` / `완료(PR 링크)`.
@@ -311,7 +311,7 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - `src/backend/__init__.py`에서 진입점을 노출하고, 목업 모드(`mock/`)와 실제 구현의 전환 방식은 README에 적는다.
 - **파일**: `src/backend/router.py`(이전 단계에서 구현), `src/backend/__init__.py`(진입점·전환), `src/backend/factory.py`(실제 구현 조립·지연 생성 체인)
 - **구현에서 정한 것**
-  - [x] **전환 방식**: `BACKEND_IMPL=real`이면 실제 구현, 없거나 `mock`이면(기본) 목업. retrieval·chunking의 `*_IMPL`과 같은 방식이고, 기본이 목업이라 키·DB 없는 개발 환경과 CI가 그대로 동작한다. 답변 평가기는 J 전까지 항상 목업이다.
+  - [x] **전환 방식**: `BACKEND_IMPL=real`이면 실제 구현, 없거나 `mock`이면(기본) 목업. retrieval·chunking의 `*_IMPL`과 같은 방식이고, 기본이 목업이라 키·DB 없는 개발 환경과 CI가 그대로 동작한다. 답변 평가기도 같은 방식으로 `real`이면 J 단계의 실제 평가기다.
   - [x] **세션 저장소 공유**: 두 진입점이 서로를 인자로 받지 않으므로 `factory.shared_session_store()`(프로세스 안에서 하나)로 DB 풀·Redis 연결이 두 벌이 되지 않게 한다. QA 서비스는 이 저장소를 `sessions`와 `history`로 함께 받는다(멀티턴).
   - [x] **트레이서**: `create_tracer()`(키가 없으면 기록 없이 동작)를 주입한다.
   - [x] **OpenAI 키가 없을 때**: 모델 클라이언트(`ChatOpenAI`)를 **앱 시작 때 미리 만들어 보고**(`warm_up`) 실패하면 첫 요청 때 다시 시도한다(`LazyAnswerChain`). 키가 없어도 앱(`/health`)은 뜨고 그 요청만 `model_failed`(502)로 돌려준다. 미리 만드는 이유: 실제 실행의 trace에서 첫 요청에만 `build-context`와 `generate-answer` 사이에 약 1.1초 공백이 있었고, 새 프로세스에서 재 보니 클라이언트 생성이 약 0.75초였다(나머지 약 0.35초는 원인을 확인하지 못했다). 원인은 서버 로그에만 남기고(첫 번째만 스택) 사용자 응답에는 넣지 않는다. 검색 결과가 없어 모델을 부르지 않는 요청은 키 없이도 `abstained`(200)다.
@@ -342,12 +342,25 @@ H는 선택 과제다(캐시). 일정이 모자라면 맨 뒤로 미룬다.
   - 서비스 오류로 답변이 없으면 `decision`은 0, 확인할 수 없는 항목은 `unavailable`. 채점 호출 실패를 0/1로 바꾸지 않는다.
   - 채점 호출의 시간·토큰은 서비스 `meta`에 합산하지 않는다.
   - 보안 문항은 `security.bad_claims`가 응답에 나타나면 해당 항목을 감점한다(판정 방식은 구현이 정하고 README에 적는다).
-- **파일**: `src/backend/evaluator.py`
+- **파일**: `src/backend/evaluator.py`, `__init__.py`(`BACKEND_IMPL=real`이면 연결), 의존성 `ragas==0.4.3`·`langchain-community==0.3.31`
 - **완료 기준**
-  - [ ] 모의 Judge/RAGAS로 not_applicable, unavailable, 정상 점수 경로가 모두 테스트된다.
-  - [ ] 결과 순서·길이가 입력과 같다.
-  - [ ] 정답 정보가 서비스 입력이나 `final_context`로 새지 않는다.
-  - [ ] 실제 모델로 소수 문항을 돌려 사람이 원문과 대조한다.
+  - [x] 모의 Judge/RAGAS로 not_applicable, unavailable, 정상 점수 경로가 모두 테스트된다.
+  - [x] 결과 순서·길이가 입력과 같다(느린 문항이 앞에 있어도 순서 유지, 동시 문항 수 상한 확인).
+  - [x] 정답 정보가 서비스 입력이나 `final_context`로 새지 않는다(Faithfulness 입력에는 `reference` 인자가 없고, `QAResult`를 고치지 않으며, Judge에는 근거 인용문 원문도 보내지 않는다).
+  - [x] 실제 모델로 소수 문항을 돌려 사람이 원문과 대조한다. → 4건(정답·오답+금지 주장·되묻기·보류). **사람의 대조는 아직이다**: 아래 결과를 보고 확인한다.
+- **구현에서 정한 것** (선택해야 했던 값은 자료의 `run_ragas.py`를 따랐고, 자료에 없는 것은 **임시** 값이다)
+  - [x] **RAGAS는 라이브러리를 쓴다**(0.4.3, `ragas.metrics.collections`). 평가 모델 `gpt-6-luna`(`EVAL_MODEL`), `reasoning_effort=none`, 최대 출력 2,048, `AsyncOpenAI` SDK 재시도 0 + RAGAS 재시도 1, timeout 60초, `AnswerRelevancy(strictness=3)`: 자료와 같다. **임시**: 동시 문항 수 4(`EVAL_MAX_CONCURRENCY`), Judge 시도 2회, 지표 전체 timeout은 호출 timeout의 4배.
+  - [x] **`langchain-community`는 0.3.31로 고정**한다. 0.4.x는 `ragas` 0.4.3 import 때 `langchain_community.chat_models.vertexai` 오류가 난다(자료 README가 같은 버전을 고정한다). `pandas`·`datasets`·`instructor` 등이 따라 들어와 이미지가 커진다(선택 의존성으로 뺄지는 팀이 정한다).
+  - [x] **임베딩**: 자료의 `LocalE5`는 쓰지 않고 주입된 `Embedder.embed_query`를 어댑터로 감싼다(양쪽 모두 질문용 = 자료의 `query:` 대칭과 같다). 계약(`create_answer_evaluator(embedder)`)을 따른 것이다.
+  - [x] **선택 지표(결정 8)**: 기본은 `answer_relevancy`만(임베더가 있을 때). `context_recall`·`context_precision`은 `EVAL_RAGAS_EXTRA`로 켜고 참고 정답이 있는 문항만 계산한다. 문항당 호출 수가 크게 늘기 때문이다.
+  - [x] **Faithfulness 대상**: `answered`만 RAGAS로 채점한다. 되묻기·보류는 `not_applicable`(사실 주장 없음). 주장이 하나도 안 나오면 RAGAS가 NaN을 주고 이를 `not_applicable`로 바꾼다. NaN·범위 밖 값은 `unavailable`이다(0으로 채우지 않는다).
+  - [x] **문맥 표기**: RAGAS와 Judge 모두 모델이 실제로 본 형태(`[S1] 파일명 p.3\n본문`)를 쓴다(`context._render_block` 재사용).
+  - [x] **Judge**: 문항당 한 번의 구조화 출력(`facts`·`conditions`·`evidence`·`decision` + `bad_claims_asserted`). 해당 없음(`score=null`)의 기준은 채점 기준이 비었거나 사실 주장이 없는 경우이다. 서비스 오류 응답은 호출 없이 `decision=0`, 나머지 `unavailable`.
+  - [x] **보안 `bad_claims`**: Judge가 판정하고, **보안 문항일 때만** 코드가 `decision`·`facts`를 0으로 내린다(README의 한계 참고).
+  - [x] **오류 격리**: 문항 하나의 실패는 그 문항만 `unavailable`이고 전체를 깨뜨리지 않는다. 오류 문구에는 예외 종류만 남기고 원문·키는 넣지 않는다.
+- **실제 모델 확인에서 알게 된 것**: (1) 처음에는 **일반 문항에서 Judge가 `bad_claims_asserted=true`를 내** 엉뚱한 사유(보안 문항의 bad_claims)로 감점됐다. 코드가 보안 문항일 때만 받도록 고치고 프롬프트도 보강했다(회귀 테스트 있음). (2) 보류 답변의 `evidence`가 "인용 없음"으로 0점이 돼, 사실 주장이 없는 답변은 null로 하도록 프롬프트를 고쳤다. 고친 뒤 재실행: 정답 → Faithfulness 1.0·Judge 전부 1, 오답 → 0.0·Judge 0, 되묻기·보류 → Faithfulness `not_applicable`, 보류의 `decision`은 1.
+- **테스트**: `tests/test_answer_evaluator.py`(가짜 RAGAS·가짜 Judge: 순서·길이·동시성 상한, not_applicable/unavailable/정상 경로, 오류 응답, 정답 비유출, 태그 무력화, bad_claims, 문항별 오류 격리, `LlmJudge` 재시도·timeout, 임베더 어댑터, 설정). 실제 모델 호출은 테스트에 없다(수동 확인).
+- **알려진 한계**: Judge는 한 모델의 의미 판단이라 틀릴 수 있고 같은 입력도 값이 조금 달라질 수 있다(`temperature=0`으로 줄였을 뿐). 문항당 호출이 많아(선택 지표를 켜면 10회 이상) 전체 문항×세 방식을 돌리면 비용·시간이 커진다. 채점 호출의 토큰·비용은 집계하지 않는다(서비스 `meta`와 분리). 평가 러너가 없어 `app/`에서 아직 호출하는 곳이 없다(아래 열린 항목).
 
 ### K. 보안 비교 지원
 
