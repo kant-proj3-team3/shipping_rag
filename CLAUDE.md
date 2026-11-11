@@ -99,12 +99,13 @@ repo/
 - compose 안의 `api`·`cli`는 `.env`의 `localhost` 주소를 서비스 이름(`qdrant`, `redis`)으로 덮어쓴다. 호스트에서 직접 실행할 때는 `.env`의 `localhost` 주소를 쓴다. `app/`이 시작할 때(api·cli) 저장소 루트의 `.env`를 읽는다(다른 경로는 `ENV_FILE`). 이미 설정된 환경변수는 덮어쓰지 않고, 값이 빈 항목은 설정하지 않는다. 모듈(`packages/*`)은 `.env`를 읽지 않고 환경변수만 본다.
 - 권장 환경변수: `QDRANT_URL`, `REDIS_URL`, `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`. 값은 `.env`(커밋 금지), 목록은 `.env.example`.
 - 브라우저(프론트 개발 서버)에서 api 를 직접 부르려면 `CORS_ALLOW_ORIGINS`(쉼표 구분, 예: `http://localhost:5173`)에 출처를 적는다. 비어 있으면 CORS 를 켜지 않는다.
-- **목업 단계(실제 구현 전)**: 모듈의 `create_*`는 `src/<모듈>/mock/`의 목업을 돌려준다. 목업 인덱서는 manifest 를 `MOCK_INDEX_DIR`(기본 `./.mock_index`)에 저장하므로, `cli index` 를 먼저 실행하고 api 를 (재)시작해야 `index_ready` 가 `true` 가 된다. 색인 없이 화면·API 만 시연하려면 `MOCK_INDEX_READY=1`. 실제 구현이 들어오면 두 변수는 쓰지 않는다.
+- **구현 선택**: `app/`(api·cli)은 기본으로 실제 구현으로 조립된다(`APP_IMPL=real`). `APP_IMPL=mock`이면 세 모듈 모두 목업, 모듈 하나만 바꾸려면 `CHUNKING_IMPL`·`RETRIEVAL_IMPL`·`BACKEND_IMPL`을 직접 준다(모듈별 값이 우선). 모듈(`packages/*`)의 기본값은 목업이라 모듈 단위 테스트·CI는 키·DB 없이 돈다. 실제 구현은 `OPENAI_API_KEY`와 Qdrant·Redis·PostgreSQL이 필요하다. `INDEX_NAME`은 영문·숫자·`_`·`-`·`.`만 쓸 수 있고 `.env.example`의 자리표시자를 고치지 않으면 오류로 알린다.
+- **목업 모드(`APP_IMPL=mock`)**: 목업 인덱서는 manifest 를 `MOCK_INDEX_DIR`(기본 `./.mock_index`)에 저장하므로, `cli index` 를 먼저 실행하고 api 를 (재)시작해야 `index_ready` 가 `true` 가 된다. 색인 없이 화면·API 만 시연하려면 `MOCK_INDEX_READY=1`. 실제 구현에서는 두 변수를 쓰지 않는다.
 - **인덱스 반영은 재시작으로 한다**: api 는 시작 시 `get_manifest` 를 한 번 읽는다(없으면 `/health` 가 `index_ready=false`). 색인·재색인 뒤에는 api 를 재시작한다. 실행 중 자동 반영은 아직 없다. 같은 `index_name` 을 `--rebuild` 하면 `fingerprint` 가 바뀌므로, 캐시 키에 `fingerprint` 가 있어야 옛 답변이 나가지 않는다(`CONTRACTS.md` 백엔드 절).
 - 한글 Windows 콘솔에서 스크립트 출력이 깨지거나 인코딩 오류가 나면 `PYTHONUTF8=1` 을 설정한다.
 
 ```bash
-docker compose up -d qdrant redis                     # 인프라만 (목업 단계의 api 는 쓰지 않는다)
+docker compose up -d qdrant redis postgres            # 인프라만
 docker compose up -d --build                          # 전체(api 포함, app/ 과 uv.lock 이 있어야 빌드된다)
 docker compose --profile tools run --rm cli index     # 배치 CLI 실행 (데이터는 ./data 를 읽기 전용으로 마운트)
 docker compose restart api                            # 색인(재색인 포함) 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다
@@ -113,6 +114,8 @@ uv sync
 uv run uvicorn app.api:create_app --factory           # 호스트에서 api 실행 (팩토리 방식)
 uv run python -m app.cli index [--rebuild]            # 색인. 같은 index_name 은 --rebuild 로만 덮어쓴다
 uv run python -m app.cli eval --k 5 --unit page       # 검색 평가: 세 방식을 같은 k·unit 으로 비교 (unit 은 기본값 없음)
+uv run python -m app.cli eval-answer [--split development] [--limit N]   # 답변 평가(RAGAS+Judge, 모델 호출). 캐시를 자동으로 끈다. 보고서는 eval_reports/
+uv run python -m app.cli compare-security [--mode hybrid]               # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출)
 uv run python scripts/build_contract_manifest.py                   # 계약 변경 시: 예시 검사 + openapi·viewer 재생성 + manifest 작성
 uv run python scripts/build_contract_manifest.py --check --against origin/dev   # CI와 같은 검사 (릴리스 PR은 --strict 추가)
 uv run python scripts/check_dataset_mapping.py --documents <합친 documents/> --evaluation <evaluation/>

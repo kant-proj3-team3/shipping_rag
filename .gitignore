@@ -22,3 +22,4 @@ frontend/dist/
 Thumbs.db
 # 목업 인덱서가 저장하는 manifest
 .mock_index/
+eval_reports/

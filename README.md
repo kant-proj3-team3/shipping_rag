@@ -4,37 +4,46 @@ KANT 프로젝트3 팀3 — 제공된 PDF(해운, 50개)에서 근거를 찾아 
 
 ## 현재 상태
 
-- **뼈대 완료**: 계약(`packages/common`, `contracts/`), 모듈 3개(chunking·retrieval·backend)의 인터페이스와 목업, `app/` 조립, CI·계약 검사.
-- **실제 구현은 아직 없다.** 모듈의 `create_*`는 `src/<모듈>/mock/`의 목업을 돌려준다(PDF를 읽지 않고, LLM·Qdrant·Redis·Langfuse를 쓰지 않는다). 목업으로도 API와 CLI 흐름 전체가 돌아간다.
-- 다음: 각자 `feat/<모듈>` 브랜치에서 자기 모듈의 안쪽만 구현한다(`CLAUDE.md`의 진행 순서 ②).
-- 프론트엔드(`frontend/`)는 아직 시작 전이다.
+- **모듈 3개(chunking·retrieval·backend)의 실제 구현이 모두 들어왔고**, `app/`(api·cli)은 기본으로 실제 구현으로 조립된다. 모듈 단위 테스트와 CI 는 목업으로 돈다(모듈의 기본값은 목업).
+- 실제 구성: PDF 구조 청킹·로컬 E5 임베딩 → Qdrant 색인 → 세 검색 방식(Naive / 하이브리드 / 하이브리드+리랭킹) → `gpt-6-luna` 답변 → 출처 검증, PostgreSQL 세션 이력(Redis 캐시), Redis 답변 캐시, Langfuse 기록, 답변 평가(RAGAS Faithfulness + Judge)와 보안 비교.
+- 실제 구현에는 `OPENAI_API_KEY`(모델)와 Qdrant·Redis·PostgreSQL(compose)이 필요하다. 키·DB 없이 화면·API 흐름만 보려면 `APP_IMPL=mock`.
+- 프론트엔드는 `frontend/`([frontend/README.md](frontend/README.md)).
 
 ## 빠른 시작
 
 ```bash
 uv sync                               # 루트에서 한 번만. 가상환경은 루트에 하나
-uv run pytest                         # 전체 테스트 (모듈 + 조립)
+uv run pytest                         # 전체 테스트 (모듈 + 조립, 목업 기반이라 키·DB 없이 돈다)
 uv run python scripts/import_lint.py  # 모듈 경계 검사
 uv run python scripts/build_contract_manifest.py --check   # 계약 검사
 ```
 
-### 목업 API 띄우기 (Docker)
+### 실제 구현으로 실행 (Docker)
 
 ```bash
-docker compose up -d --build                          # qdrant + redis + api (.env 는 없어도 된다)
-docker compose --profile tools run --rm cli index     # 목업 색인
-docker compose restart api                            # api 는 시작 시 한 번만 인덱스를 읽는다
+cp .env.example .env                                  # OPENAI_API_KEY 와 INDEX_NAME(개인 구분)을 채운다
+docker compose up -d qdrant redis postgres            # 인프라
+docker compose --profile tools run --rm cli index     # 색인 (처음 한 번, 몇 분. 데이터는 ./data 를 읽기 전용으로 마운트)
+docker compose up -d --build                          # api 포함 전체
+docker compose restart api                            # 색인(재색인 포함) 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다
 ```
 
-`http://localhost:8000/docs`에서 `/health`, `/query`, `/session/{id}`를 확인한다. 색인 전에는 `/health`가 `index_ready:false`다. 색인 없이 화면만 보려면 `.env`에 `MOCK_INDEX_READY=1`을 적고 api를 (재)시작한다.
+`http://localhost:8000/docs`에서 `/health`, `/query`, `/session/{id}`를 확인한다. 색인 전에는 `/health`가 `index_ready:false`다.
 
 ### 호스트에서 직접 실행
 
 ```bash
+docker compose up -d qdrant redis postgres            # 인프라는 compose 로
 uv run python -m app.cli index                        # 색인 (같은 이름은 --rebuild 로만 덮어쓴다)
-uv run python -m app.cli eval --k 5 --unit page       # 검색 평가: 세 방식 비교 (unit 은 기본값 없음)
 uv run uvicorn app.api:create_app --factory           # api (색인을 먼저 한다)
+uv run python -m app.cli eval --k 5 --unit page       # 검색 평가: 세 방식 비교 (unit 은 기본값 없음)
+uv run python -m app.cli eval-answer --limit 3        # 답변 평가(모델 호출). 보고서는 ./eval_reports
+uv run python -m app.cli compare-security             # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출)
 ```
+
+- 구현 선택: 기본은 실제(`APP_IMPL=real`). `APP_IMPL=mock`이면 목업, 모듈 하나만 바꾸려면 `CHUNKING_IMPL`·`RETRIEVAL_IMPL`·`BACKEND_IMPL`을 직접 준다(모듈별 값이 우선).
+- `eval-answer`·`compare-security`는 **답변 캐시를 자동으로 끈다**(지표 왜곡 방지). 같은 설정끼리만 점수를 비교한다. 재현성이 필요하면 `LLM_REASONING_EFFORT=none`, `LLM_TEMPERATURE=0`.
+- 보고서에는 `index_fingerprint`·`golden_fingerprint`, 설정(키 제외), 방식별 서비스 지표(분모와 집계 건수 포함)와 평가 점수(채점·해당 없음·평가 불가 건수 포함)가 담긴다.
 
 환경변수는 `.env.example`을 복사해 `.env`로 쓴다(커밋 금지). 목록과 설명은 `.env.example`에 있다. 호스트 실행(`app.cli`, `uvicorn`)은 시작할 때 저장소 루트의 `.env`를 읽고, 셸에 이미 설정된 값은 덮어쓰지 않는다.
 
