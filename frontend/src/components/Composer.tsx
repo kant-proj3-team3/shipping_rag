@@ -38,6 +38,8 @@ interface ComposerProps {
   placeholder?: string;
   /** 입력창 아래 안내 (지금 보낼 수 없는 이유 등). 없으면 키 사용법 */
   hint?: string;
+  /** 쓰던 글을 다른 글로 바꾼 직후 되돌린다. 있으면 입력창 아래 안내 대신 실행 취소 버튼을 보여 준다 */
+  onUndoReplace?: () => void;
 }
 
 /** 내용에 맞춰 입력창 높이를 맞춘다. MAX_HEIGHT_PX 를 넘으면 그 높이에서 입력창 안을 스크롤한다 */
@@ -65,6 +67,7 @@ export function Composer({
   inputRef,
   placeholder = "질문을 입력하세요",
   hint,
+  onUndoReplace,
 }: ComposerProps) {
   const isTouch = useMediaQuery(TOUCH_QUERY, false);
   const countId = useId();
@@ -163,7 +166,20 @@ export function Composer({
         )}
       </div>
       <div className="mt-1.5 flex justify-between gap-4 px-2 text-xs text-zinc-500">
-        <span>{hint ?? (isTouch ? TOUCH_HINT : KEYBOARD_HINT)}</span>
+        {onUndoReplace ? (
+          <span role="status" className="flex min-w-0 items-center gap-2">
+            <span className="truncate">입력하던 글을 바꿨습니다</span>
+            <button
+              type="button"
+              onClick={onUndoReplace}
+              className="shrink-0 font-medium text-zinc-700 underline underline-offset-2 dark:text-zinc-300"
+            >
+              실행 취소
+            </button>
+          </span>
+        ) : (
+          <span>{hint ?? (isTouch ? TOUCH_HINT : KEYBOARD_HINT)}</span>
+        )}
         <span id={countId} className="shrink-0 tabular-nums">
           {value.length} / {MAX_QUESTION_LENGTH}
         </span>

@@ -58,7 +58,9 @@ export function App() {
     panelRef,
     triggerRef,
   } = useDrawer();
-  const { draft, setDraft, fillIfEmpty } = useDraft(chat.currentId ?? NEW_CHAT_DRAFT_KEY);
+  const { draft, setDraft, replaceDraft, canUndoReplace, undoReplace } = useDraft(
+    chat.currentId ?? NEW_CHAT_DRAFT_KEY,
+  );
   const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(DEFAULT_RETRIEVAL_MODE);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,14 +71,20 @@ export function App() {
   const isBusyHere = chat.isBusy && chat.activeId === chat.currentId;
   const isBusyElsewhere = chat.isBusy && !isBusyHere;
 
-  // memo 된 대화 화면에 넘기므로 렌더마다 새로 만들지 않는다. 되묻기의 원래 질문 · 예시 질문을 입력창에 채운다
+  // memo 된 대화 화면에 넘기므로 렌더마다 새로 만들지 않는다. 되묻기의 원래 질문 · 예시 질문으로 입력창을 바꾼다
+  // (쓰던 글이 있었으면 입력창 아래 실행 취소로 살린다)
   const handleFillDraft = useCallback(
     (text: string) => {
-      fillIfEmpty(text);
+      replaceDraft(text);
       inputRef.current?.focus();
     },
-    [fillIfEmpty],
+    [replaceDraft],
   );
+
+  function handleUndoReplace(): void {
+    undoReplace();
+    inputRef.current?.focus();
+  }
 
   function handleNewChat(): void {
     chat.newChat();
@@ -175,6 +183,7 @@ export function App() {
           inputRef={inputRef}
           placeholder={isAwaitingClarification(chat.messages) ? CLARIFY_PLACEHOLDER : undefined}
           hint={composerHintOf(chat.isChecking, isBusyElsewhere)}
+          onUndoReplace={canUndoReplace ? handleUndoReplace : undefined}
         />
       </main>
     </div>
