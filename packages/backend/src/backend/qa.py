@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -84,9 +85,22 @@ from common.types import (
 
 logger = logging.getLogger(__name__)
 
-# 임시 기본값(목업과 같다). 검색 개수 설정은 팀이 정하면 생성자 인자로 바꾼다.
+# 기본 검색 방식은 요청에 방식이 없을 때만 쓴다(프론트는 하이브리드+리랭킹을 보낸다).
 DEFAULT_MODE = RetrievalMode.HYBRID
-DEFAULT_K = 5
+# 모델에 넘길 검색 결과 수. 팀 결정: k=10. 환경변수 `ANSWER_K` 로 바꾼다(RetrievalRequest 의 k 범위 1~50).
+ENV_ANSWER_K = "ANSWER_K"
+DEFAULT_K = 10
+_MAX_K = 50
+
+
+def answer_k() -> int:
+    """환경변수에서 검색 개수를 읽는다. 없거나 잘못된(숫자 아님·1~50 밖) 값이면 기본값."""
+    raw = os.environ.get(ENV_ANSWER_K, "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_K
+    return value if 1 <= value <= _MAX_K else DEFAULT_K
 
 # 사용자에게 나가는 문구. 내부 정보가 섞이지 않도록 고정 문자열만 쓴다.
 _USER_MESSAGES: dict[ErrorCode, str] = {
@@ -142,7 +156,7 @@ class BackendQAService:
         sessions: SessionRecorder,
         *,
         default_mode: RetrievalMode = DEFAULT_MODE,
-        k: int = DEFAULT_K,
+        k: int | None = None,
         variant: PromptVariant = PromptVariant.BASE,
         tracer: Tracer | None = None,
         history: HistorySource | None = None,
@@ -156,7 +170,7 @@ class BackendQAService:
         # 멀티턴: 이력을 읽을 저장소(보통 `sessions` 와 같은 객체). 없으면 단발로만 동작한다.
         self._history = history
         self._default_mode = default_mode
-        self._k = k
+        self._k = answer_k() if k is None else k  # 인자가 없으면 `ANSWER_K`(없으면 10). 서비스를 만들 때 한 번 읽는다
         self._variant = variant
         # 기록은 부가 기능이다. 어떤 트레이서가 들어와도 장애 격리 래퍼를 씌워 응답에 영향이 없게 한다.
         self._tracer: Tracer = guard(tracer if tracer is not None else NoopTracer())
