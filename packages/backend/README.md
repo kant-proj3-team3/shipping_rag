@@ -2,7 +2,7 @@
 
 FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → 프롬프트·모델 호출 → 검증 → 출처 매핑을 하는 QA 서비스, PostgreSQL 세션 이력(원본)과 Redis 캐시·세션 조회 캐시, Langfuse 기록, 답변 품질 평가를 맡는다. 검색 구현과 청킹은 하지 않는다.
 
-> 현재 상태: **구현 진행 중**. 라우터는 실제 계약(경로·모델·HTTP 상태)대로 동작한다. 실제 QA 서비스(`qa.py`: 검색 → 문맥 → 모델 → 검증), Langfuse 기록(`tracing.py`), 세션(`session.py`·`session_db.py`: PostgreSQL 원본 + Redis 캐시)은 구현됐지만, `create_qa_service`와 `create_session_service`는 아직 `src/backend/mock/`의 목업을 돌려준다(전환은 I 단계). 평가는 목업이다. 답변 캐시(`cache.py`)는 구현됐지만 아직 진입점에 연결되지 않았다(I 단계). 진행 현황은 [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+> 현재 상태: **구현 진행 중**. 라우터는 실제 계약(경로·모델·HTTP 상태)대로 동작한다. 실제 QA 서비스(`qa.py`: 검색 → 문맥 → 모델 → 검증), Langfuse 기록(`tracing.py`), 세션(`session.py`·`session_db.py`: PostgreSQL 원본 + Redis 캐시)은 구현됐고, `create_qa_service`와 `create_session_service`는 `BACKEND_IMPL=real`이면 이를 돌려주고 아니면(기본) `src/backend/mock/`의 목업을 돌려준다([전환 방식](#목업과-실제-구현-전환)). 답변 평가기는 아직 목업이다. 답변 캐시(`cache.py`)는 실제 모드에서 `CACHE_ENABLED`가 꺼져 있지 않으면 쓰인다. 진행 현황은 [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
 
 ## 공개 인터페이스
 
@@ -27,6 +27,21 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 
 자세한 규칙은 [`CLAUDE.md`](CLAUDE.md)와 루트 [`CONTRACTS.md`](../../CONTRACTS.md)를 본다.
 
+## 목업과 실제 구현 전환
+
+`create_qa_service`·`create_session_service`는 환경변수 `BACKEND_IMPL`로 구현을 고른다(retrieval·chunking의 `RETRIEVAL_IMPL`·`CHUNKING_IMPL`과 같은 방식).
+
+| `BACKEND_IMPL` | 동작 |
+|---|---|
+| 없음 / `mock` (기본) | 목업. 키·DB 없이 돌아서 CI와 다른 모듈의 개발이 그대로 동작한다 |
+| `real` | 실제 QA 서비스(검색 → 문맥 → 모델 → 검증)와 PostgreSQL 원본 + Redis 캐시 세션. `OPENAI_API_KEY`·`DATABASE_URL`·`REDIS_URL`을 쓰고, `LANGFUSE_PUBLIC_KEY`·`LANGFUSE_SECRET_KEY`가 있으면 Langfuse에 기록한다 |
+
+- 답변 평가기(`create_answer_evaluator`)는 J 단계 전까지 `BACKEND_IMPL`과 상관없이 목업이다.
+- **답변 캐시**: 실제 모드는 `CACHE_ENABLED`가 꺼져 있지 않으면(기본 켜짐) `create_answer_cache()`를 주입한다. **평가를 돌릴 때는 꺼야 한다**(적중한 응답은 모델을 부르지 않아 시간·토큰 지표를 왜곡한다). 자세한 내용은 아래 "답변 캐시" 항목.
+- **세션 저장소는 프로세스 안에서 하나를 공유한다.** 두 진입점이 서로를 인자로 받지 않으므로 각자 만들면 DB 풀과 Redis 연결이 두 벌이 된다(`factory.shared_session_store()`). QA 서비스는 이 저장소에 턴을 기록하고(`sessions`) 같은 저장소에서 이전 대화를 읽는다(`history`, 멀티턴).
+- **모델 클라이언트는 시작 때 만들어 보고, 못 만들면 첫 요청 때 다시 시도한다.** `OPENAI_API_KEY`가 없으면 `ChatOpenAI`를 만들 때 실패하는데, 실패하면 앱을 못 띄우게 하면 키 하나 때문에 api 전체(`/health` 포함)가 안 뜬다. 그래서 시작 때 만들어 보되(`warm_up`) 실패해도 앱은 띄운다. 정상적으로는 첫 요청이 클라이언트 생성 시간(실측 약 0.75초)을 치르지 않는다. 못 만든 채로 요청이 오면 다시 시도하고, 또 못 만들면 그 요청만 `status=error`(`model_failed`, HTTP 502)로 돌려준다(계약: 예외를 던지지 않는다). 원인은 서버 로그에만 남기고(첫 번째만 스택) 사용자 응답에는 넣지 않는다. 실패는 기억하지 않고 요청마다 다시 시도하지만, 환경변수는 시작 때 읽히므로 고치려면 재시작해야 한다. 검색 결과가 없어 모델을 부르지 않는 요청(`abstained`)은 키 없이도 정상 응답한다.
+- 실제 모드로 api를 띄우려면 retrieval·chunking도 실제 구현이어야 의미가 있다(`CHUNKING_IMPL=real`, `RETRIEVAL_IMPL=real`, Qdrant 색인). 세 변수의 목록은 루트 `.env.example`에 있다.
+
 ## 목업 (`src/backend/mock/`)
 
 | 클래스 | 동작 |
@@ -41,7 +56,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
 
 - 모델 호출(`chain.py`): 모델은 `json_schema`(strict) 구조화 출력으로 `ModelOutput` 스키마를 강제받는다(Chat Completions 고정). 재시도는 별도 요청이 아니라 같은 요청의 일부다. 호출 실패와 읽을 수 없는 출력(`parsed=None`)을 같은 시도 예산으로 다시 시도하고, 토큰은 응답을 받은 시도만 합산한다(하나라도 사용량이 없으면 `None`). 끝내 응답이 없으면 `ModelTimeoutError`/`ModelCallError`, 응답은 있으나 못 읽으면 `ChainResult.output=None`으로 돌려주고 `output_invalid` 판단은 검증 단계가 한다. 스키마가 입력 토큰을 약 20% 늘린다. 출력 형식과 필드 설명은 `ModelOutput`(스키마)이 맡고 시스템 프롬프트에는 적지 않는다(프롬프트 버전 `v2`).
 - 출력 검증(`validate.py`): 출처는 모델이 쓴 문서명·페이지가 아니라 이번 요청의 문맥(`Chunk`)에서 코드가 채운다. 범위 밖 `source_id`는 항상 거부하고, `abstained`의 출처는 범위 안이면 허용한다. 여러 페이지에 걸친 청크는 페이지마다 `Citation`을 만든다. 검증이 끝내 실패하면 예외 없이 실패 이유를 돌려주고 `output_invalid`로 바꾸는 일은 QA 서비스가 한다.
-- Langfuse 기록(`tracing.py`): 요청 하나가 trace 하나다. 트리는 `qa-query`(질문 → status·answer·citations, 메타에 request_id·토큰·시간·오류 코드) 아래에 `retrieve`(순위·점수·chunk_id 전부), `build-context`(예산 적용 전후, S번호↔chunk_id, 제외된 chunk_id), `generate-answer`(LangChain 콜백이 만든 모델 호출 단계)가 붙는다. 검색에는 있는데 `dropped_chunk_ids`에 있으면 문맥 축소로 빠진 것이고, 처음부터 없으면 검색 단계 문제다.
+- Langfuse 기록(`tracing.py`): 요청 하나가 trace 하나다. 트리는 `qa-query`(질문 → status·answer·citations, 메타에 request_id·토큰·시간·오류 코드) 아래에 `load-history`(멀티턴: 이전 대화 개수, 본문 없음), `retrieve`(순위·점수·chunk_id 전부), `build-context`(예산 적용 전후, S번호↔chunk_id, 제외된 chunk_id), `generate-answer`(LangChain 콜백이 만든 모델 호출 단계), `record-session`(`session_id`가 있을 때 세션 저장소 기록, 실패하면 ERROR로 닫힌다)가 붙는다. `record-session`이 따로 있는 이유는 저장소가 느려지거나 꺼졌을 때의 지연(timeout만큼)이 어느 단계에도 안 잡히면 원인을 찾기 어렵기 때문이다. `meta.latency_ms`는 이 기록 직전까지의 시간이고 root span은 기록까지 포함한다. 검색에는 있는데 `dropped_chunk_ids`에 있으면 문맥 축소로 빠진 것이고, 처음부터 없으면 검색 단계 문제다.
   - `trace_id`는 `request_id`를 씨앗으로 만들어(같은 요청은 같은 trace) **로컬에서 만든 식별자**다. 전송은 SDK가 백그라운드로 하므로 `meta.trace_id`는 "기록을 시작했다"는 뜻이고, 서버 도착은 아래 확인 방법으로 본다. 기록을 시작하지 못하면 `None`이다.
   - 장애 격리: 트레이서는 항상 예외를 모두 잡는 래퍼로 감싸진다. Langfuse가 꺼져 있거나 SDK가 예외를 내도 응답은 그대로 나가고 `trace_id=None`이다. 요청 경로에서 `flush()`를 부르지 않는다.
   - 마스킹: 전송 직전에 모든 문자열 속성에서 이메일과 API 키(환경에 설정된 키 값 자체 포함)를 가린다. 정규식이라 이름·주소 같은 다른 개인정보는 막지 못한다. 질문 원문은 이 규칙만 적용해 남긴다.
@@ -64,7 +79,7 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
   - 검증은 이번 요청의 문맥만 기준이다. 이전 답변이 인용한 출처가 이번 문맥에 없으면 거부한다. 이력은 `final_context`에 들어가지 않는다.
   - **이력 조회가 실패하면 단발로 답한다**(경고와 트레이스 표시). 트레이스에는 `load-history` 단계(개수만, 본문 없음)와 `history_turns`·`history_error` 메타가 남는다.
   - **알려진 한계**: 검색은 여전히 **원문 질문**으로 한다. 후속 질문("그럼 초과하면 하루에 얼마야?")이나 되물음에 대한 짧은 답("2024년 3월이요")은 검색어로 빈약해서 관련 자료를 못 찾고 `abstained`가 될 수 있다. 이력은 모델이 지시어를 이해하는 데만 쓰인다. 검색까지 돕는 방법(질문 재작성, 이전 질문을 검색어에 덧붙이기)은 따로 측정해서 정한다. DB와 Redis 캐시가 모두 없을 때는 이력 읽기와 턴 기록이 각각 timeout을 기다려 요청이 `DATABASE_TIMEOUT_S`의 두 배쯤 늦어진다(실제로 약 4.3초).
-  - `BackendQAService(..., history=저장소)`로 이력 저장소를 주입한다(보통 세션 저장소와 같은 객체). 진입점 연결(`create_qa_service`)은 I 단계다. 목업(`MockQAService`)은 이력을 쓰지 않는다.
+  - `BackendQAService(..., history=저장소)`로 이력 저장소를 주입한다(보통 세션 저장소와 같은 객체). `BACKEND_IMPL=real`의 `create_qa_service`가 공유 세션 저장소를 `sessions`와 `history`에 함께 주입한다. 목업(`MockQAService`)은 이력을 쓰지 않는다.
 - **답변 캐시(H, `cache.py`)**: 같은 조건의 질문에 저장된 답변을 돌려준다. `BackendQAService(..., cache=캐시)`로 주입한다(없으면 항상 새로 만든다).
   - **키**는 답을 바꿀 수 있는 모든 입력의 해시다(`rag:answer:` 공간, 세션 키와 분리): 질문(공백·NFC 정규화), `retrieval_mode`, `k`, `index_name`+`embedder_id`+**`manifest.fingerprint`**(같은 이름으로 재색인하면 바뀌어 옛 답변이 나가지 않는다), 프롬프트 버전, 모델·추론 강도·temperature, 문맥 토큰 예산, 저장 형식 버전. 하나라도 다르면 적중하지 않는다.
   - **이력이 프롬프트에 들어가는 요청은 읽지도 쓰지도 않는다**(계약). 세션이 있어도 이력이 비어 있는 첫 질문은 단발과 프롬프트가 같으므로 쓴다. 그래서 효과는 같은 첫 질문이 반복될 때뿐이다.
@@ -73,15 +88,16 @@ FastAPI 라우터(`/health`, `/query`, `/session/{id}`), 질문 → 검색 → �
   - **장애**: 캐시는 부가 기능이라 읽기·쓰기가 실패해도 캐시 없이 응답한다. **읽기에 실패하면 쓰기도 건너뛴다**(Redis가 죽었을 때 timeout을 두 번 치르지 않게). 캐시 Redis는 세션 저장소와 **timeout을 따로** 둔다(`CACHE_TIMEOUT_S`, 기본 0.5초): 실제로 Redis를 멈추고 재 보니 조회 실패가 4.1초 → 0.5초가 됐다(`REDIS_URL=redis://127.0.0.1…` 기준).
   - **`localhost` 함정**: Redis가 꺼져 있으면 `redis://localhost`는 실패까지 timeout의 **두 배**가 걸린다. `localhost`가 IPv6(`::1`)와 IPv4로 풀려 두 주소를 차례로 시도하기 때문이다(timeout 0.5초일 때 `localhost` 1.05초, `127.0.0.1` 0.51초. 재시도 때문이 아님을 확인했다). 세션 저장소의 Redis(`REDIS_TIMEOUT_S` 2초)는 같은 이유로 4초가 걸린다. `REDIS_URL`을 `127.0.0.1`로 쓰면 한 번만 기다린다.
   - **평가를 돌릴 때는 꺼야 한다**(`CACHE_ENABLED=false`): 적중한 응답은 모델을 부르지 않아 시간·토큰 지표를 왜곡한다. 적중 여부는 `meta.cache_hit`으로 알 수 있다. 기본은 켜짐이다.
-  - **알려진 한계**: 모델이 매번 같은 답을 내지는 않는다(추론 모델). 캐시는 그중 하나를 TTL 동안 고정하므로 잘못된 답이 한 번 저장되면 TTL 동안 반복된다. 진입점 연결(`create_qa_service`가 `create_answer_cache()`를 주입)은 I 단계에서 한다.
-- `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 둘 다 `create_session_store()`로 같은 PostgreSQL(`DATABASE_URL`)과 Redis(`REDIS_URL`)를 본다.
+  - **알려진 한계**: 모델이 매번 같은 답을 내지는 않는다(추론 모델). 캐시는 그중 하나를 TTL 동안 고정하므로 잘못된 답이 한 번 저장되면 TTL 동안 반복된다. 실제 모드의 `create_qa_service`가 `CACHE_ENABLED`가 꺼져 있지 않으면 `create_answer_cache()`를 주입한다(진입점 연결, I 단계).
+- `create_qa_service`와 `create_session_service`는 서로를 인자로 받지 않으므로, 목업은 모듈 전역 저장소를 공유한다. 실제 구현은 `factory.shared_session_store()`로 PostgreSQL(`DATABASE_URL`)+Redis(`REDIS_URL`) 저장소 **하나를** 만들어 둘이 같이 쓴다(연결·풀이 두 벌이 되지 않는다).
 - 캐시 키의 `index_name`+`embedder_id`는 `retriever.index`에서 읽는다(`create_qa_service`가 `IndexManifest`를 따로 받지 않는다).
 
 ## 설정 (환경변수)
 
 | 이름 | 기본값 | 설명 |
 |---|---|---|
-| `OPENAI_API_KEY` | (없음) | `ChatOpenAI`가 읽는다. 커밋하지 않는다 |
+| `BACKEND_IMPL` | `mock` | `real`이면 실제 QA 서비스와 PostgreSQL+Redis 세션, 아니면 목업([전환 방식](#목업과-실제-구현-전환)) |
+| `OPENAI_API_KEY` | (없음) | `ChatOpenAI`가 읽는다. 커밋하지 않는다. 없으면 `real`에서 `/query`가 `model_failed`(502)로 나간다 |
 | `LLM_MODEL` | `gpt-6-luna` | 생성 모델 |
 | `LLM_TIMEOUT_S` | `60` | 모델 호출 1회 timeout(초) |
 | `LLM_MAX_RETRIES` | `2` | 첫 호출 뒤 추가 시도 횟수 |

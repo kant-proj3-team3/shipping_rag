@@ -43,7 +43,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from backend.cache import AnswerCache, CacheKey, normalize_question
-from backend.chain import AnswerChain, ModelCallError, ModelTimeoutError
+from backend.chain import AnswerGenerator, ModelCallError, ModelTimeoutError
 from backend.context import ContextBuild, build_context, context_max_tokens
 from backend.history import HistorySource, history_max_turns, load_history
 from backend.prompts import HistoryTurn, PromptVariant, prompt_version
@@ -52,6 +52,7 @@ from backend.tracing import (
     STEP_CONTEXT,
     STEP_HISTORY,
     STEP_RETRIEVE,
+    STEP_SESSION,
     NoopTracer,
     RequestTrace,
     TraceStep,
@@ -136,7 +137,7 @@ class BackendQAService:
     def __init__(
         self,
         retriever: Retriever,
-        chain: AnswerChain,
+        chain: AnswerGenerator,
         sessions: SessionRecorder,
         *,
         default_mode: RetrievalMode = DEFAULT_MODE,
@@ -385,6 +386,9 @@ class BackendQAService:
             meta=meta,
         )
         if request.session_id:
+            # 기록을 단계로 감싼다: 저장소(DB·Redis)가 느려지거나 꺼졌을 때 그 지연이 trace 에 보이게 한다.
+            # (meta.latency_ms 는 이 기록 직전까지의 시간이고, root span 은 이 기록까지 포함한다.)
+            step = trace.step(STEP_SESSION, {"status": status.value})
             try:
                 turn = SessionTurn(
                     request_id=ctx.request_id,
@@ -399,6 +403,10 @@ class BackendQAService:
                 await asyncio.to_thread(self._sessions.append, request.session_id, turn)
             except Exception:  # noqa: BLE001 - 기록 실패가 답변 실패가 되지 않게 한다
                 logger.warning("세션 기록 실패 request_id=%s", ctx.request_id, exc_info=True)
+                step.end(error="session_record_failed")
+                trace.annotate(session_record_error=True)
+            else:
+                step.end({"recorded": True})
         result = QAResult(response=resp, final_context=list(items))
         # 캐시에 저장한다. 키가 있는 요청만(캐시를 쓰고, 이력이 없고, 읽기에 성공했고, 새로 만든 응답) 저장하고 error 는 저장하지 않는다.
         if cache_key is not None and status is not AnswerStatus.ERROR:

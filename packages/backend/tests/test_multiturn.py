@@ -307,3 +307,51 @@ def test_no_history_step_when_there_is_no_session():
     service = _service(RecordingLLM(_answer("답")), _store(), tracer=tracer)
     _ask(service, "질문", session_id=None)
     assert "load-history" not in [s.name for s in tracer.traces[0].steps]
+
+
+# ── 세션 기록 단계(record-session) ──
+def test_session_write_is_its_own_step_after_generation():
+    # 저장소(DB·Redis)가 느려지거나 꺼졌을 때의 지연이 trace 어느 단계에도 안 잡히던 문제를 막는다.
+    tracer = FakeTracer()
+    service = _service(RecordingLLM(_answer("답")), _store(), tracer=tracer)
+    _ask(service, "질문")
+
+    steps = tracer.traces[0].steps
+    assert [s.name for s in steps] == ["load-history", "retrieve", "build-context", "record-session"]
+    record = steps[-1]
+    assert record.input == {"status": "answered"} and record.output == {"recorded": True} and record.error is None
+
+
+def test_session_write_step_is_also_there_when_nothing_was_found():
+    tracer = FakeTracer()
+    service = _service(RecordingLLM(_answer("답")), _store(), tracer=tracer, retriever=FakeRetriever([]))
+    result = _ask(service, "자료에 없는 질문")
+
+    assert result.response.status is AnswerStatus.ABSTAINED  # 모델을 부르지 않는 경로도 기록한다
+    assert [s.name for s in tracer.traces[0].steps][-1] == "record-session"
+
+
+def test_no_session_write_step_without_session_id():
+    tracer = FakeTracer()
+    service = _service(RecordingLLM(_answer("답")), _store(), tracer=tracer)
+    _ask(service, "질문", session_id=None)
+    assert "record-session" not in [s.name for s in tracer.traces[0].steps]
+
+
+class AppendFailsStore(RedisSessionStore):
+    def append(self, session_id, turn):
+        raise ConnectionError("db down")
+
+
+def test_session_write_failure_is_visible_in_the_trace_but_does_not_fail_the_answer():
+    tracer = FakeTracer()
+    store = AppendFailsStore(
+        fakeredis.FakeRedis(server=fakeredis.FakeServer(), decode_responses=True), ttl_s=3600
+    )
+    service = _service(RecordingLLM(_answer("답")), store, tracer=tracer)
+    result = _ask(service, "질문")
+
+    assert result.response.status is AnswerStatus.ANSWERED  # 기록 실패가 응답 실패가 되지 않는다
+    record = tracer.traces[0].steps[-1]
+    assert record.name == "record-session" and record.error == "session_record_failed"
+    assert tracer.traces[0].annotations["session_record_error"] is True

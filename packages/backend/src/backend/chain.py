@@ -50,7 +50,7 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
@@ -305,6 +305,24 @@ def structured_model(chat_model: Runnable) -> Runnable:
 
 
 # ── 체인 ─────────────────────────────────────────────────────────────
+class AnswerGenerator(Protocol):
+    """검증 단계(`generate_validated`)와 QAService 가 체인에 요구하는 것. `AnswerChain` 과 지연 생성 체인(`factory.py`)이 만족한다."""
+
+    @property
+    def config(self) -> ChainConfig: ...
+
+    async def generate(
+        self,
+        question: str,
+        context_text: str,
+        variant: PromptVariant = ...,
+        *,
+        history: Sequence[HistoryTurn] = ...,
+        callbacks: Sequence[BaseCallbackHandler] | None = ...,
+        attempt_limit: int | None = ...,
+    ) -> ChainResult: ...
+
+
 class AnswerChain:
     """주입받은 LLM 으로 답변을 생성한다.
 
