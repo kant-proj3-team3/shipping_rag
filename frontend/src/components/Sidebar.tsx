@@ -24,7 +24,12 @@ interface SidebarProps {
   saveResult: SaveResult;
 }
 
-/** 왼쪽 사이드바: 새 대화 · 대화 목록 · 서버 상태 · 팀 로고 */
+// 서버가 정상이 아닌지 (연결 안 됨 · 인덱스 준비 중). 처음 확인하는 동안은 열 때마다 배가 잠깐 가라앉지 않게 정상과 같이 본다
+function isServerDown(health: HealthState): boolean {
+  return health.kind === "offline" || health.kind === "index_not_ready";
+}
+
+/** 왼쪽 사이드바: 새 대화 · 대화 목록 · 서버 상태 · 팀 로고 (서버가 정상이 아니면 로고의 배가 가라앉는다) */
 export function Sidebar({
   health,
   conversations,
@@ -70,7 +75,7 @@ export function Sidebar({
           </p>
         ) : null}
         <ServerStatus state={health} />
-        <TeamLogo />
+        <TeamLogo isSinking={isServerDown(health)} />
       </div>
     </aside>
   );
