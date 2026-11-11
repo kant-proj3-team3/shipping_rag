@@ -115,7 +115,7 @@ uv run uvicorn app.api:create_app --factory           # 호스트에서 api 실�
 uv run python -m app.cli index [--rebuild]            # 색인. 같은 index_name 은 --rebuild 로만 덮어쓴다
 uv run python -m app.cli eval --k 5 --unit page       # 검색 평가: 세 방식을 같은 k·unit 으로 비교 (unit 은 기본값 없음)
 uv run python -m app.cli eval-answer [--split development] [--limit N]   # 답변 평가(RAGAS+Judge, 모델 호출). 캐시를 자동으로 끈다. 보고서는 eval_reports/
-uv run python -m app.cli compare-security [--mode hybrid]               # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출)
+uv run python -m app.cli compare-security [--mode hybrid_rerank]       # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출). 평가 기본 검색 방식은 hybrid_rerank(팀 결정), 비교는 --mode 를 여러 번
 uv run python scripts/build_contract_manifest.py                   # 계약 변경 시: 예시 검사 + openapi·viewer 재생성 + manifest 작성
 uv run python scripts/build_contract_manifest.py --check --against origin/dev   # CI와 같은 검사 (릴리스 PR은 --strict 추가)
 uv run python scripts/check_dataset_mapping.py --documents <합친 documents/> --evaluation <evaluation/>

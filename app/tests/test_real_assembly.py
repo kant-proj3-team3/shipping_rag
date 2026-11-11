@@ -227,13 +227,57 @@ def test_eval_answer_writes_a_report_with_fingerprints_and_forces_cache_off(monk
     assert "보고서:" in capsys.readouterr().out
 
 
-def test_eval_answer_defaults_to_all_three_modes_and_development_split(monkeypatch, tmp_path):
+def test_eval_answer_defaults_to_hybrid_rerank_and_development_split(monkeypatch, tmp_path):
+    """팀 결정: 기본 검색 방식은 하이브리드+리랭킹이다. 다른 방식은 --mode 로 명시한다."""
     _mock_stack(monkeypatch)
     out = tmp_path / "rep.json"
     assert cli.main(["eval-answer", "--out", str(out)]) == 0
     rep = json.loads(out.read_text(encoding="utf-8"))
-    assert list(rep["modes"]) == [m.value for m in RetrievalMode]
-    assert all(r["split"] == "development" for r in rep["modes"]["naive"]["items"])
+    assert list(rep["modes"]) == ["hybrid_rerank"]
+    assert all(r["split"] == "development" for r in rep["modes"]["hybrid_rerank"]["items"])
+
+
+def test_eval_answer_can_still_compare_all_three_modes(monkeypatch, tmp_path):
+    _mock_stack(monkeypatch)
+    out = tmp_path / "rep.json"
+    args = ["eval-answer", "--limit", "1", "--out", str(out)]
+    for m in RetrievalMode:
+        args += ["--mode", m.value]
+    assert cli.main(args) == 0
+    assert list(json.loads(out.read_text(encoding="utf-8"))["modes"]) == [m.value for m in RetrievalMode]
+
+
+def test_eval_answer_rows_keep_the_answer_text_context_and_trace_for_failure_analysis(monkeypatch, tmp_path):
+    _mock_stack(monkeypatch)
+    out = tmp_path / "rep.json"
+    assert cli.main(["eval-answer", "--limit", "2", "--out", str(out)]) == 0
+    row = json.loads(out.read_text(encoding="utf-8"))["modes"]["hybrid_rerank"]["items"][0]
+    assert isinstance(row["answer"], str) and row["answer"]
+    assert isinstance(row["reason"], str)
+    assert isinstance(row["context_pages"], list) and all(p.count(":p") == 1 for p in row["context_pages"])
+    assert "trace_id" in row  # 목업은 기록하지 않으므로 None 일 수 있다(0 으로 채우지 않는다)
+
+
+def test_report_records_k_and_prompt_version_only_for_the_real_backend(monkeypatch, tmp_path):
+    # 목업 백엔드는 k·프롬프트를 쓰지 않으므로 값을 지어내지 않고 None 으로 남긴다
+    _mock_stack(monkeypatch)
+    out = tmp_path / "mock.json"
+    assert cli.main(["eval-answer", "--limit", "1", "--out", str(out)]) == 0
+    rep = json.loads(out.read_text(encoding="utf-8"))
+    assert rep["k"] is None and rep["prompt_version"] is None
+
+
+def test_answer_config_reports_the_k_the_service_resolves(monkeypatch):
+    from backend.prompts import prompt_version
+
+    monkeypatch.setenv("BACKEND_IMPL", "real")
+    monkeypatch.delenv("ANSWER_K", raising=False)
+    assert cli._answer_config() == {"k": 10, "prompt_version": prompt_version()}
+    monkeypatch.setenv("ANSWER_K", "7")
+    assert cli._answer_config()["k"] == 7
+    monkeypatch.setenv("ANSWER_K", "abc")  # 잘못된 값은 서비스가 기본값으로 돌아간 결과를 남긴다
+    assert cli._answer_config()["k"] == 10
+    assert "ANSWER_K" in cli._SETTINGS  # 환경변수 원문도 settings 에 남는다
 
 
 def test_eval_answer_without_index_fails_with_a_message(monkeypatch, capsys):

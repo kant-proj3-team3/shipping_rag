@@ -42,7 +42,7 @@ uv run python -m app.cli compare-security             # 보안 문항을 기본�
 ```
 
 - 구현 선택: 기본은 실제(`APP_IMPL=real`). `APP_IMPL=mock`이면 목업, 모듈 하나만 바꾸려면 `CHUNKING_IMPL`·`RETRIEVAL_IMPL`·`BACKEND_IMPL`을 직접 준다(모듈별 값이 우선).
-- `eval-answer`·`compare-security`는 **답변 캐시를 자동으로 끈다**(지표 왜곡 방지). 같은 설정끼리만 점수를 비교한다. 재현성이 필요하면 `LLM_REASONING_EFFORT=none`, `LLM_TEMPERATURE=0`.
+- `eval-answer`·`compare-security`는 **답변 캐시를 자동으로 끈다**(지표 왜곡 방지). 같은 설정끼리만 점수를 비교한다. 기본 검색 방식은 하이브리드+리랭킹(`--mode`로 바꾼다), 보고서에는 `k`·`prompt_version`·인덱스 fingerprint가 남고 문항별 답변 본문·문맥 페이지·trace_id도 들어 있다. 재현성이 필요하면 `LLM_REASONING_EFFORT=none`, `LLM_TEMPERATURE=0`.
 - 보고서에는 `index_fingerprint`·`golden_fingerprint`, 설정(키 제외), 방식별 서비스 지표(분모와 집계 건수 포함)와 평가 점수(채점·해당 없음·평가 불가 건수 포함)가 담긴다.
 
 환경변수는 `.env.example`을 복사해 `.env`로 쓴다(커밋 금지). 목록과 설명은 `.env.example`에 있다. 호스트 실행(`app.cli`, `uvicorn`)은 시작할 때 저장소 루트의 `.env`를 읽고, 셸에 이미 설정된 값은 덮어쓰지 않는다.
