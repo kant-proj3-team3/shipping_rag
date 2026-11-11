@@ -1,5 +1,6 @@
 import { HistoryList } from "./HistoryList";
 import { ServerStatus } from "./ServerStatus";
+import { TeamLogo } from "./TeamLogo";
 import type { HealthState } from "../hooks/useHealth";
 import type { DeletedConversation } from "../hooks/useUndoDelete";
 import type { Conversation } from "../lib/chat";
@@ -23,7 +24,7 @@ interface SidebarProps {
   saveResult: SaveResult;
 }
 
-/** 왼쪽 사이드바: 새 대화 · 대화 목록 · 서버 상태 */
+/** 왼쪽 사이드바: 새 대화 · 대화 목록 · 서버 상태 · 팀 로고 */
 export function Sidebar({
   health,
   conversations,
@@ -69,6 +70,7 @@ export function Sidebar({
           </p>
         ) : null}
         <ServerStatus state={health} />
+        <TeamLogo />
       </div>
     </aside>
   );
