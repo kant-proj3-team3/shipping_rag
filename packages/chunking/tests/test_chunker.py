@@ -1,7 +1,7 @@
 """청킹 단위 테스트 (pdfplumber 구조 → Chunk). PDF 없이 가짜 페이지 구역으로 돈다."""
 
 from chunking.chunker import chunk_page, pack_items
-from chunking.pdf_parser import PageStructure, join_lines
+from chunking.pdf_parser import PageStructure, _clean_cell, join_lines
 from common.types import Chunk
 
 # ── 청킹 ──────────────────────────────────────────────────────────────
@@ -52,3 +52,13 @@ def test_pack_items_keeps_single_oversized_item_whole():
 
 def test_join_lines_rule():
     assert join_lines(["무료기", "간은 3일", "USD", "68"]) == "무료기간은 3일 USD 68"
+
+
+def test_clean_cell_joins_email_wrapped_by_cell_width():
+    # 칸 폭 때문에 꺾인 이메일은 붙이고, 서로 다른 값은 지금처럼 공백으로 잇는다
+    assert _clean_cell("vgm@gaonroute.exa\nmple") == "vgm@gaonroute.example"
+    assert _clean_cell("docs@gaonroute.\nexample") == "docs@gaonroute.example"
+    assert _clean_cell("GR26-P0670\nP26-20-0670") == "GR26-P0670 P26-20-0670"
+    assert _clean_cell("20GP\n최초 2026-10-25") == "20GP 최초 2026-10-25"
+    assert _clean_cell("vgm@gaonroute.example\n접수 완료") == "vgm@gaonroute.example 접수 완료"
+    assert _clean_cell(None) == ""

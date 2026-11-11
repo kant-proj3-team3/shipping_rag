@@ -7,6 +7,7 @@ pypdf 처럼 글자만 뽑으면 칸 구분과 글자 크기가 사라져 줄 �
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -58,9 +59,26 @@ def join_lines(lines: list[str]) -> str:
     return text
 
 
+_WRAPPED_PART = re.compile(r"[A-Za-z0-9.\-]+")  # 칸 폭 때문에 다음 줄로 넘어간 이메일 조각 ("mple")
+
+
 def _clean_cell(cell: str | None) -> str:
-    # 칸 안의 줄바꿈은 서로 다른 값(화주와 화물 등)을 나누는 경우가 많아 공백으로 잇는다
-    return " ".join((cell or "").split())
+    """칸 안의 줄을 잇는다.
+
+    칸 안의 줄바꿈은 서로 다른 값(화주와 화물 등)을 나누는 경우가 많아 공백으로 잇는다.
+    단, 앞줄 끝 단어가 이메일(@ 포함)이고 다음 줄이 영문·숫자·점 조각이면 칸 폭 때문에 꺾인 것이라
+    공백 없이 붙인다 ("vgm@gaonroute.exa" + "mple" → "vgm@gaonroute.example").
+    """
+    text = ""
+    for line in (cell or "").splitlines():
+        line = " ".join(line.split())
+        if not line:
+            continue
+        if text and "@" in text.rsplit(" ", 1)[-1] and _WRAPPED_PART.fullmatch(line):
+            text += line
+        else:
+            text = f"{text} {line}" if text else line
+    return text
 
 
 def read_page(page: pdfplumber.page.Page, page_number: int) -> PageStructure:
