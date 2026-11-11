@@ -25,6 +25,34 @@
   --animate-seal-float-late: seal-float 2.4s ease-in-out -1.2s infinite;
   --animate-seal-pop: seal-pop 1.2s ease-in-out infinite;
 
+  /* 팀 로고의 움직임 (TeamLogo). 마우스를 올린 동안 물이 흘러가고 깃발이 펄럭인다 */
+  --animate-logo-wave: logo-wave 1.2s linear infinite;
+  --animate-logo-flag: logo-flag 0.6s ease-in-out infinite;
+
+  /* 물결 한 번 길이(6)만큼 왼쪽으로 옮겼다가 처음으로 돌아온다. 모양이 같아 이어 흐르는 것처럼 보인다 */
+  @keyframes logo-wave {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-6px);
+    }
+  }
+
+  /* 돛대에 매인 쪽을 축으로 깃발 끝이 위아래로 흔들린다 */
+  @keyframes logo-flag {
+    0%,
+    100% {
+      transform: skewY(0deg) scaleX(1);
+    }
+    25% {
+      transform: skewY(-12deg) scaleX(0.9);
+    }
+    75% {
+      transform: skewY(10deg) scaleX(0.95);
+    }
+  }
+
   @keyframes seal-bob {
     0%,
     100% {
