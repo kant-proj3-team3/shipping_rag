@@ -3,8 +3,11 @@
 방식
 ====
 세션 이력의 앞선 질문과 답을 **프롬프트에 직접 넣는다**. 질문을 독립 질문으로 다시 쓰는 단계는 없다.
-그래서 후속 질문("그럼 초과하면 하루에 얼마야?")의 **검색은 여전히 원문 질문으로** 이뤄진다. 이력은 모델이 지시어와
-되물은 조건에 대한 답을 이해하는 데만 쓰이고, 검색 품질은 좋아지지 않는다(알려진 한계).
+
+검색어는 기본적으로 **이번 질문 원문**이다. 단 바로 앞 턴(들)이 **되묻기(needs_clarification)** 였다면, 이번 질문은 빠진 조건에 대한
+짧은 답일 가능성이 크므로 그 되묻기를 받은 **이전 질문들을 이번 질문 앞에 붙여** 검색한다(`clarification_questions`,
+`build_search_query`). 되묻기가 아닌 턴을 만나면 거기서 멈추므로, 이미 답이 나온 질문은 섞이지 않는다.
+되묻지 않은 일반 후속 질문("그럼 초과하면 하루에 얼마야?")은 여전히 원문으로만 검색된다(알려진 한계).
 
 무엇을 넣나
 -----------
@@ -30,14 +33,17 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from backend.context import TokenCounter, approx_token_count
 from backend.prompts import HistoryTurn, format_turn
-from common.types import SessionInfo, SessionTurn
+from common.types import AnswerStatus, SessionInfo, SessionTurn
 
 ENV_HISTORY_MAX_TURNS = "HISTORY_MAX_TURNS"
 ENV_HISTORY_MAX_TOKENS = "HISTORY_MAX_TOKENS"
+# 검색어 길이 상한. 질문 상한(QueryRequest.question, 500자)과 같게 둬 임베더 입력 한도를 넘지 않게 한다.
+SEARCH_QUERY_MAX_CHARS = 500
 # 임시 기본값. 팀이 정하면 환경변수로 바꾼다(코드 수정 없음).
 DEFAULT_HISTORY_MAX_TURNS = 3
 DEFAULT_HISTORY_MAX_TOKENS = 2_000
@@ -106,6 +112,75 @@ def select_history(
     return selected
 
 
+def clarification_questions(turns: Sequence[SessionTurn], *, max_turns: int) -> list[str]:
+    """검색어에 함께 넣을 이전 질문: 바로 앞에서 **연속으로 되묻기(needs_clarification)를 받은 질문들**(오래된 것 → 최신 순).
+
+    직전 턴이 되묻기가 아니면 빈 목록이다(= 이번 질문만 검색한다). 되묻기가 이어졌다면 그 질문을 모두 모은다.
+    되묻기가 아닌 턴을 만나면 거기서 멈춘다: 그 앞은 이미 답이 나온 별개의 질문이다. 최근 `max_turns` 턴 안에서만 본다.
+    """
+    if max_turns <= 0:
+        return []
+    picked: list[str] = []
+    for turn in reversed(turns[-max_turns:]):
+        if turn.status is not AnswerStatus.NEEDS_CLARIFICATION:
+            break
+        picked.append(turn.question)
+    picked.reverse()
+    return picked
+
+
+def build_search_query(question: str, prior_questions: Sequence[str], *, max_chars: int = SEARCH_QUERY_MAX_CHARS) -> str:
+    """검색어를 만든다: `이전 되묻기 질문들 + 이번 질문`. 이전 질문이 없으면 이번 질문 그대로다.
+
+    임베더 입력 한도(질문 상한과 같은 500자)를 넘지 않게, 최근 질문부터 담고 넘치면 더 오래된 질문을 뺀다(질문을 중간에서 자르지 않는다).
+    이번 질문은 항상 그대로 들어간다.
+    """
+    room = max_chars - len(question)
+    kept: list[str] = []
+    for prior in reversed(prior_questions):
+        cost = len(prior) + 1  # 구분 공백
+        if cost > room:
+            break  # 더 오래된 질문을 건너뛰고 뒤를 잇지 않는다(대화 순서가 끊기지 않게)
+        kept.append(prior)
+        room -= cost
+    kept.reverse()
+    return " ".join([*kept, question])
+
+
+@dataclass(frozen=True)
+class Conversation:
+    """세션에서 읽은 이전 대화: 프롬프트에 넣을 이력과, 검색어에 함께 넣을 되묻기 질문들."""
+
+    history: list[HistoryTurn] = field(default_factory=list)
+    prior_questions: list[str] = field(default_factory=list)
+
+
+async def load_conversation(
+    source: HistorySource,
+    session_id: str,
+    *,
+    max_turns: int | None = None,
+    max_tokens: int | None = None,
+    count_tokens: TokenCounter = approx_token_count,
+) -> Conversation:
+    """세션 이력을 한 번 읽어 프롬프트용 이력과 검색어용 되묻기 질문을 함께 고른다. 조회 실패는 그대로 던진다."""
+    turns_limit = history_max_turns() if max_turns is None else max_turns
+    if turns_limit <= 0:
+        return Conversation()
+    info = await asyncio.to_thread(source.get, session_id, turns_limit)  # 저장소가 블로킹이라 루프 밖에서 부른다
+    if info is None:
+        return Conversation()
+    return Conversation(
+        history=select_history(
+            info.turns,
+            max_turns=turns_limit,
+            max_tokens=history_max_tokens() if max_tokens is None else max_tokens,
+            count_tokens=count_tokens,
+        ),
+        prior_questions=clarification_questions(info.turns, max_turns=turns_limit),
+    )
+
+
 async def load_history(
     source: HistorySource,
     session_id: str,
@@ -115,24 +190,21 @@ async def load_history(
     count_tokens: TokenCounter = approx_token_count,
 ) -> list[HistoryTurn]:
     """세션 이력을 읽어 프롬프트에 넣을 이전 대화를 고른다. 없는 세션이면 빈 목록이다. 조회 실패는 그대로 던진다."""
-    turns_limit = history_max_turns() if max_turns is None else max_turns
-    if turns_limit <= 0:
-        return []
-    info = await asyncio.to_thread(source.get, session_id, turns_limit)  # 저장소가 블로킹이라 루프 밖에서 부른다
-    if info is None:
-        return []
-    return select_history(
-        info.turns,
-        max_turns=turns_limit,
-        max_tokens=history_max_tokens() if max_tokens is None else max_tokens,
-        count_tokens=count_tokens,
+    conversation = await load_conversation(
+        source, session_id, max_turns=max_turns, max_tokens=max_tokens, count_tokens=count_tokens
     )
+    return conversation.history
 
 
 __all__ = [
+    "Conversation",
     "HistorySource",
+    "SEARCH_QUERY_MAX_CHARS",
+    "build_search_query",
+    "clarification_questions",
     "history_max_tokens",
     "history_max_turns",
+    "load_conversation",
     "load_history",
     "select_history",
 ]
