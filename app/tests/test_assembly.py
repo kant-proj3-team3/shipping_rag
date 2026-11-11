@@ -13,6 +13,10 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("DOCUMENTS_DIR", str(tmp_path / "docs"))
     monkeypatch.setenv("INDEX_NAME", "test-index")
     monkeypatch.setenv("ENV_FILE", str(tmp_path / "no-such.env"))  # 개발자의 실제 .env 가 테스트에 끼지 않게 한다
+    monkeypatch.setenv("APP_IMPL", "mock")  # 이 파일은 목업 조립을 확인한다(실제 구현 조립은 test_real_assembly.py)
+    for var in ("CHUNKING_IMPL", "RETRIEVAL_IMPL", "BACKEND_IMPL"):
+        monkeypatch.setenv(var, "mock")  # apply_impl_default 가 환경변수를 새로 만들어도 테스트가 끝나면 지워지도록 한 번 설정해 둔다
+        monkeypatch.delenv(var)
     monkeypatch.delenv("MOCK_INDEX_READY", raising=False)
     monkeypatch.delenv("CORS_ALLOW_ORIGINS", raising=False)
 

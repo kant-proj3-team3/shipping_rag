@@ -1,13 +1,17 @@
 # 로컬 개발·시연용. 모든 서비스가 같은 네트워크에서 서비스 이름으로 서로를 찾는다.
+# api·cli 는 기본으로 실제 구현(청킹·검색·백엔드)으로 조립된다. 목업으로 돌리려면 .env 에 APP_IMPL=mock.
 #
-#   docker compose up -d qdrant redis        # 인프라만
-#   docker compose up -d --build             # 전체: qdrant + redis + api
-#   docker compose --profile tools run --rm cli index   # 배치 CLI(인덱싱·평가) 실행
-#   docker compose restart api               # 색인 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다 (그 전에는 /health 의 index_ready=false)
-#   (목업 단계) 색인 없이 시연하려면 api 환경에 MOCK_INDEX_READY=1
-#   docker compose down                      # 중지(데이터 볼륨은 유지) / down -v 는 데이터까지 삭제
+#   docker compose up -d qdrant redis postgres           # 인프라만
+#   docker compose --profile tools run --rm cli index    # 색인(처음 한 번. 몇 분 걸린다). 다시 만들려면 index --rebuild
+#   docker compose up -d --build                         # 전체: qdrant + redis + postgres + api
+#   docker compose restart api                           # 색인 뒤에 한다: api 는 시작 시 한 번만 인덱스를 읽는다 (그 전에는 /health 의 index_ready=false)
+#   docker compose --profile tools run --rm cli eval --k 5 --unit page   # 검색 평가
+#   docker compose --profile tools run --rm cli eval-answer --limit 3    # 답변 평가(모델 호출). 보고서는 ./eval_reports
+#   docker compose --profile tools run --rm cli compare-security         # 보안 문항을 기본·방어 프롬프트로 비교(모델 호출)
+#   docker compose down                                  # 중지(데이터 볼륨은 유지) / down -v 는 인덱스·대화 이력까지 삭제
 #
-# 전제: .env 파일은 선택(.env.example을 복사해 쓴다). api·cli는 루트 pyproject.toml/uv.lock 과 app/ 이 있어야 빌드된다.
+# 전제: .env 파일은 선택이지만 실제 구현은 OPENAI_API_KEY 가 필요하다(.env.example을 복사해 쓴다). INDEX_NAME 은 자리표시자를 고쳐 쓴다.
+# api·cli는 루트 pyproject.toml/uv.lock 과 app/ 이 있어야 빌드된다.
 
 name: rag-qa
 
@@ -68,7 +72,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag}@postgres:5432/${POSTGRES_DB:-rag}
       RAG_MODEL_CACHE: /models
-      MOCK_INDEX_DIR: /mock_index   # (목업 단계) cli 가 색인한 manifest 를 api 가 읽는다. api 는 시작 시 한 번 읽으므로 색인 후 재시작한다
+      MOCK_INDEX_DIR: /mock_index   # APP_IMPL=mock 일 때만 쓴다: cli 가 색인한 manifest 를 api 가 읽는다(실제 구현은 Qdrant 가 인덱스 원본)
     ports:
       - "8000:8000"
     volumes:
@@ -101,21 +105,27 @@ services:
     environment:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag}@postgres:5432/${POSTGRES_DB:-rag}
       RAG_MODEL_CACHE: /models
       DOCUMENTS_DIR: /data/documents
       EVALUATION_DIR: /data/evaluation
-      MOCK_INDEX_DIR: /mock_index
+      MOCK_INDEX_DIR: /mock_index   # APP_IMPL=mock 일 때만 쓴다
     volumes:
       - ./data:/data:ro   # 원본 PDF·평가 JSON (저장소에 커밋하지 않는다). 읽기 전용
+      - ./eval_reports:/app/eval_reports   # 평가 보고서(eval-answer·compare-security). 커밋하지 않는다
       - model_cache:/models
       - mock_index:/mock_index
     depends_on:
-      - qdrant
-      - redis
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
   qdrant_data:
   redis_data:
   postgres_data:   # 세션 이력 원본. down -v 는 이것도 지운다
   model_cache:
-  mock_index:   # (목업 단계) 목업 인덱서 manifest. down -v 는 이것도 지운다
+  mock_index:   # APP_IMPL=mock 일 때만 쓰는 목업 인덱서 manifest. down -v 는 이것도 지운다

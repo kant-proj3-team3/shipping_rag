@@ -12,7 +12,7 @@ from common.api import PATH_HEALTH
 from common.types import HealthResponse
 
 from .envfile import load_env_file
-from .wiring import build_base, build_services, index_name, wait_for_manifest
+from .wiring import apply_impl_default, build_base, build_services, index_name, wait_for_manifest
 
 
 def cors_origins() -> list[str]:
@@ -22,6 +22,7 @@ def cors_origins() -> list[str]:
 
 def create_app() -> FastAPI:
     load_env_file()  # 호스트 실행 시 .env 적용 (이미 설정된 환경변수는 덮어쓰지 않는다)
+    apply_impl_default()  # 기본은 실제 구현. APP_IMPL=mock 이면 목업
     app = FastAPI(title="RAG Q&A API", version="0.1.0")
     origins = cors_origins()
     if origins:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass
 
@@ -19,11 +20,38 @@ from common.interfaces import (
     Retriever,
     SessionService,
 )
+from common.errors import InvalidInputError
 from common.types import IndexManifest
+
+# 모듈별 구현 선택 환경변수. 같은 값(real/mock)을 세 모듈에 한꺼번에 적용하는 것이 APP_IMPL 이다.
+MODULE_IMPL_VARS = ("CHUNKING_IMPL", "RETRIEVAL_IMPL", "BACKEND_IMPL")
+DEFAULT_APP_IMPL = "real"
+_INDEX_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+
+def apply_impl_default() -> str:
+    """`APP_IMPL`(기본 `real`)을 세 모듈의 `*_IMPL` 기본값으로 적용한다. 이미 설정된 모듈별 값은 덮어쓰지 않는다.
+
+    app 을 실행하면(api·cli) 실제 구현으로 조립된다. 목업으로 돌리려면 `APP_IMPL=mock`, 모듈 하나만 바꾸려면
+    그 모듈의 `*_IMPL` 을 직접 준다. 모듈(`packages/*`)의 기본값은 그대로 목업이라 모듈 단위 테스트·CI 는 영향이 없다.
+    """
+    impl = (os.environ.get("APP_IMPL") or DEFAULT_APP_IMPL).strip().lower()
+    if impl not in {"real", "mock"}:
+        raise InvalidInputError(f"APP_IMPL 은 real 또는 mock 이어야 한다(받은 값: {impl!r})")
+    for var in MODULE_IMPL_VARS:
+        os.environ.setdefault(var, impl)
+    return impl
 
 
 def index_name() -> str:
-    return os.environ.get("INDEX_NAME", "rag-dev-local")
+    """색인(컬렉션) 이름. `.env.example` 의 자리표시자(`<본인이름>`)가 그대로 남아 있으면 알려 준다."""
+    name = os.environ.get("INDEX_NAME", "rag-dev-local")
+    if not _INDEX_NAME.match(name):
+        raise InvalidInputError(
+            f"INDEX_NAME={name!r} 는 컬렉션 이름으로 쓸 수 없다. 영문·숫자·_·-·. 만 쓴다(예: rag-dev-내이름). "
+            ".env.example 의 자리표시자를 고치지 않았는지 확인한다"
+        )
+    return name
 
 
 @dataclass
