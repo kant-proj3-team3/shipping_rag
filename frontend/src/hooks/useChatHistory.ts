@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { useStorage } from "./useStorage";
+import { useStorageChange } from "./useStorageChange";
 import { HISTORY_STORAGE_KEY } from "../lib/config";
 import {
   loadHistory,
@@ -60,17 +61,11 @@ export function useChatHistory(): UseChatHistoryResult {
   );
 
   // 다른 탭이 목록을 저장하면 합친다. 합치지 않으면 이 탭이 다음에 저장할 때 다른 탭의 대화를 덮어써 지운다
-  useEffect(() => {
-    function handleStorage(e: StorageEvent): void {
-      // key 가 null 이면 다른 탭이 저장소를 통째로 비웠다
-      if (e.key === HISTORY_STORAGE_KEY || e.key === null) {
-        const { conversations } = loadHistory(storage);
-        updateHistory((h) => mergeFromOtherTab(h, conversations));
-      }
-    }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+  const mergeOtherTab = useCallback(() => {
+    const { conversations } = loadHistory(storage);
+    updateHistory((h) => mergeFromOtherTab(h, conversations));
   }, [storage, updateHistory]);
+  useStorageChange(HISTORY_STORAGE_KEY, mergeOtherTab);
 
   return { history, historyRef, saveResult, updateHistory };
 }
