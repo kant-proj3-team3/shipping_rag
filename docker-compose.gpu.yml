@@ -1,0 +1,22 @@
+# GPU 를 쓰는 선택 설정(override). 기본 docker-compose.yml 만으로는 컨테이너가 CPU 로 돈다.
+# 사용: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#       docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile tools run --rm cli index
+# 전제: 호스트에 NVIDIA 드라이버와 컨테이너 GPU 지원(Linux 는 NVIDIA Container Toolkit,
+#       Windows 는 Docker Desktop 의 WSL2 백엔드)이 있어야 한다. GPU 가 없는 환경에서는 쓰지 않는다.
+# 임베더(E5)와 리랭커가 GPU 를 쓰는 것은 컨테이너 안의 torch 가 CUDA 빌드이기 때문이다
+# (Linux 이미지는 PyPI 의 torch 를 쓰며 CUDA 빌드다). 쓰는지는 `nvidia-smi` 로 확인한다.
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  api:
+    <<: *gpu
+  cli:
+    <<: *gpu
