@@ -124,6 +124,11 @@ def _evaluation_row(item: GoldenItem, result: QAResult, ev: AnswerEvaluation) ->
         "status": r.status.value,
         "error_code": r.error_code.value if r.error_code else None,
         "citations": [f"{c.book_id}:p{c.page}" for c in r.citations],
+        # 실패 원인 분석용: 모델이 실제로 낸 답과 이유, 모델에 전달한 문맥(S번호 순서대로 문서:페이지), Langfuse trace.
+        "answer": r.answer,
+        "reason": r.reason,
+        "context_pages": [f"{i.chunk.book_id}:p{i.chunk.page_start}" for i in result.final_context],
+        "trace_id": r.meta.trace_id,
         "faithfulness": _score_cell(ev.faithfulness),
         "ragas_extra": {k: _score_cell(v) for k, v in ev.ragas_extra.items()},
         "judge": {k: _score_cell(getattr(ev.judge, k)) for k in JUDGE_KEYS},
