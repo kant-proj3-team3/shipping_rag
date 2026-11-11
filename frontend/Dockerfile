@@ -33,5 +33,6 @@ CMD ["node", "server/src/main.ts"]
 # 3) 화면: 빌드 결과와 nginx 설정만 올린다 (Node 없이 뜬다). 마지막 단계라 target 없는 docker build 의 결과물이다
 FROM nginx:1.29-alpine AS web
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
