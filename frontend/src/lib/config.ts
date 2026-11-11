@@ -11,6 +11,12 @@ export const READ_TIMEOUT_MS = 5_000;
 /** /health 확인 주기 */
 export const HEALTH_INTERVAL_MS = 30_000;
 
+/** 답변 대기 표시를 이만큼 기다린 뒤에 보여 준다. 그 안에 답이 오면 그리지 않는다 (번쩍임 방지) */
+export const PENDING_SHOW_DELAY_MS = 300;
+
+/** 답변 대기 표시가 한번 보이면 최소 이만큼은 둔다. 나타나자마자 사라지지 않게 한다 */
+export const PENDING_MIN_VISIBLE_MS = 500;
+
 /** 처음 고른 검색 방식. 세 방식 중 품질 기대가 가장 높은 방식이다 */
 export const DEFAULT_RETRIEVAL_MODE: RetrievalMode = "hybrid_rerank";
 
