@@ -10,8 +10,8 @@ const BODY_PATH = "M 36 66 C 26 84 28 110 44 117 C 58 123 72 123 86 117 C 102 11
  * 금화를 두 손으로 꼭 안은 물개: LLM 머리띠, 웃는 눈.
  * 움직이면 금화를 든 손이 들썩이고 금화가 반짝이며 왼쪽 위 반짝임이 깜박인다
  */
-export function SealCoin({ isAnimated, className }: SealProps) {
-  const svg = useSealSvg({ isAnimated, className });
+export function SealCoin(props: SealProps) {
+  const svg = useSealSvg(props);
 
   return (
     <svg viewBox="0 0 128 128" aria-hidden="true" className={svg.svgClass}>

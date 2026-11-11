@@ -18,8 +18,8 @@ const SMALL_SPARKLE = sparklePath(117, 33, 5.5);
  * 펼친 책 뒤에서 연필을 든 물개: LLM 머리띠, 옆에 쌓인 책.
  * 움직이면 연필로 쓰고 눈을 깜박이며 오른쪽 위 별이 반짝인다
  */
-export function SealStudy({ isAnimated, className }: SealProps) {
-  const svg = useSealSvg({ isAnimated, className });
+export function SealStudy(props: SealProps) {
+  const svg = useSealSvg(props);
 
   return (
     <svg viewBox="0 0 128 128" aria-hidden="true" className={svg.svgClass}>

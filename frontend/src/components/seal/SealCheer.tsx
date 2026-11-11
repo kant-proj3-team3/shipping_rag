@@ -31,8 +31,8 @@ const SMALL_HEART = heartPath(117, 37, 5);
  * 응원 술을 흔드는 물개: LLM 머리띠, 질끈 감은 눈, "화이팅!".
  * 움직이면 양손의 응원 술을 번갈아 흔들고 몸이 들썩이며 하트가 떠오른다
  */
-export function SealCheer({ isAnimated, className }: SealProps) {
-  const svg = useSealSvg({ isAnimated, className });
+export function SealCheer(props: SealProps) {
+  const svg = useSealSvg(props);
 
   return (
     <svg viewBox="0 0 128 128" aria-hidden="true" className={svg.svgClass}>
