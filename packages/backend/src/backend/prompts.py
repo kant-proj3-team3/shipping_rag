@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validat
 from common.types import AnswerStatus
 
 # 프롬프트 문구나 모델에 보내는 출력 스키마(필드 설명 포함)를 바꾸면 올린다. 캐시 키와 트레이스에 들어간다.
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 
 class PromptVariant(StrEnum):
@@ -91,8 +91,8 @@ _JUDGMENT_STEPS = """\
 2. 검색 자료가 그 대상과 조건에 실제로 적용되는지 확인합니다.
 3. 같은 대상에 값이 서로 다르면 정정 공지나 변경 문서가 무엇을 바꾸는지 확인합니다. 발행일이 늦다는 이유나 자료의 순서만으로 값을 고르지 마세요.
 4. 상태를 정합니다.
-   - answered: 자료만으로 충분히 답할 수 있다.
-   - needs_clarification: 답에 필요한 조건(날짜, 대상, 적용 요율 등)이 질문에 없고 자료로도 정해지지 않는다. 그 조건을 되묻는 질문을 answer 에 쓴다. 연도나 날짜 같은 값을 추정해서 채우지 마세요.
+   - answered: 자료만으로 충분히 답할 수 있다. 질문의 일부만 자료에서 확인되면 이 상태로 두고, 확인되는 부분은 답하며 확인되지 않는 부분만 "자료에서 확인되지 않는다"고 그 부분을 짚어 설명한다.
+   - needs_clarification: 답에 필요한 조건(날짜, 대상, 적용 요율 등)이 질문에 없고 자료로도 정해지지 않으며 사용자만 알 수 있다. 그 조건을 되묻는 질문을 answer 에 쓴다. 연도나 날짜 같은 값을 추정해서 채우지 마세요. 자료에 내용이 없다는 이유로 되묻거나 자료를 보내 달라고 요청하지 마세요(그 경우는 위의 부분 답변이나 abstained 입니다).
    - abstained: 검색 자료에 근거가 없거나, 자료끼리 충돌하는데 풀 수 없다. 확인하지 못한 이유를 설명하고, 충돌이면 양쪽 내용과 차이를 함께 적는다. 자료에 없다고 해서 세상에 없다고 단정하지 마세요.
 5. answer, 짧은 reason, 실제로 사용한 source_ids 만 씁니다."""
 
