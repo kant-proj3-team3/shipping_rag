@@ -4,7 +4,8 @@
 //   node scripts/gen-schemas.mjs --check   파일이 openapi.json 과 맞는지만 본다 (다르면 종료 코드 1)
 //
 // 규칙
-// - 서버 형식: additionalProperties=false 인 모델은 모르는 키가 온 응답을 거절한다 (z.strictObject)
+// - 서버 형식: 응답의 모르는 키는 버리고 읽는다 (z.object). 계약 호환 규칙상 필드 추가는 선택 필드로만 하므로
+//   새 필드가 더해져도 화면이 쓰는 기존 필드는 그대로 있다. 모르는 값(enum 밖의 값)은 그대로 거절한다
 // - 응답 화면 타입: 키는 camelCase, format=date-time 문자열은 ms 숫자, 없을 수 있는 값은 null, 없을 수 있는 배열은 [] 로 채운다
 //   (화면 코드는 undefined 를 다루지 않는다)
 // - 요청: 키만 camelCase 로 바꾼 <이름>Input 타입과 서버 형식 본문 함수(to<이름>Body), 계약 제약 상수(최대 길이 · 형식)를 만든다
@@ -544,8 +545,6 @@ function responseCode(
     }
     return `  ${key}: ${expr},`;
   });
-  // additionalProperties=false(팀 계약 모델)면 모르는 키가 온 응답을 거절한다
-  const objectFn = s.additionalProperties === false ? "z.strictObject" : "z.object";
 
   // 화면 타입과 변환 함수는 필드마다 한 번 분류한 결과로 함께 만든다
   const planned = props.map(([key, p]) => ({
@@ -560,7 +559,7 @@ function responseCode(
 
   /** @type {Piece} */
   const piece = {
-    code: `${doc([s.description ?? `${name} 서버 형식 검증`])}export const ${v}Raw = ${objectFn}({
+    code: `${doc([s.description ?? `${name} 서버 형식 검증`])}export const ${v}Raw = z.object({
 ${fields.join("\n")}
 });
 
