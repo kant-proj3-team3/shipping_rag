@@ -33,7 +33,7 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 export const errorCodeSchema = z.enum(ERROR_CODES);
 
 /** QueryResponse가 아닌 오류 응답(현재는 /session 404). */
-export const apiErrorRaw = z.strictObject({
+export const apiErrorRaw = z.object({
   error_code: errorCodeSchema,
   message: z.string(),
 });
@@ -53,7 +53,7 @@ export function toApiError(raw: z.output<typeof apiErrorRaw>): ApiError {
 }
 
 /** 출처 한 건 */
-export const citationRaw = z.strictObject({
+export const citationRaw = z.object({
   source_id: z.string(),
   book_id: z.string(),
   file_name: z.string(),
@@ -139,7 +139,7 @@ export type RetrievalMode = (typeof RETRIEVAL_MODES)[number];
 export const retrievalModeSchema = z.enum(RETRIEVAL_MODES);
 
 /** GET /health 응답 */
-export const healthResponseRaw = z.strictObject({
+export const healthResponseRaw = z.object({
   status: z.literal("ok").default("ok"),
   index_ready: z.boolean(),
   index_name: z.string().nullable().optional(),
@@ -172,7 +172,7 @@ export function toHealthResponse(raw: z.output<typeof healthResponseRaw>): Healt
 }
 
 /** 응답 부가 정보. 모르는 값은 0 이 아니라 null 이다 */
-export const queryMetaRaw = z.strictObject({
+export const queryMetaRaw = z.object({
   retrieval_mode: retrievalModeSchema,
   latency_ms: z.number().nullable().optional(),
   input_tokens: z.number().int().nullable().optional(),
@@ -238,7 +238,7 @@ export function toQueryRequestBody(request: QueryRequestInput): Schemas["QueryRe
 }
 
 /** POST /query 응답. 오류 상태 코드(status=error)도 이 모양이다 */
-export const queryResponseRaw = z.strictObject({
+export const queryResponseRaw = z.object({
   request_id: z.string(),
   status: answerStatusSchema,
   answer: z.string(),
@@ -277,7 +277,7 @@ export function toQueryResponse(raw: z.output<typeof queryResponseRaw>): QueryRe
 }
 
 /** 세션에 기록된 질의응답 한 번. status=error 응답은 기록하지 않는다. */
-export const sessionTurnRaw = z.strictObject({
+export const sessionTurnRaw = z.object({
   request_id: z.string(),
   asked_at: z.iso.datetime({ offset: true }),
   question: z.string(),
@@ -314,7 +314,7 @@ export function toSessionTurn(raw: z.output<typeof sessionTurnRaw>): SessionTurn
 }
 
 /** GET /session/{session_id} 응답. */
-export const sessionInfoRaw = z.strictObject({
+export const sessionInfoRaw = z.object({
   session_id: z.string(),
   created_at: z.iso.datetime({ offset: true }),
   last_active_at: z.iso.datetime({ offset: true }),
