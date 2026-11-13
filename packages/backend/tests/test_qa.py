@@ -11,7 +11,7 @@ from backend.chain import AnswerChain, ChainConfig, ModelCallError, ModelTimeout
 from backend.context import ENV_CONTEXT_MAX_TOKENS
 from backend.mock.session import InMemorySessionStore
 from backend.prompts import ModelOutput
-from backend.qa import BackendQAService, error_code_for
+from backend.qa import BackendQAService, answer_k, error_code_for
 from common.errors import ContractError, IndexNotReadyError, IngestError, InvalidInputError, RetrievalError
 from common.interfaces import QAService
 from common.types import (
@@ -145,6 +145,28 @@ def test_default_mode_and_k_and_request_mode():
     _ask(svc, retrieval_mode=RetrievalMode.NAIVE)
     assert [(q.mode, q.k) for q in retr.requests] == [(RetrievalMode.HYBRID, 7), (RetrievalMode.NAIVE, 7)]
     assert all(q.query == "체선료 면제 기간은?" for q in retr.requests)  # 서비스에는 질문만 전달한다
+
+
+def test_default_k_is_10_and_follows_answer_k_env(monkeypatch):
+    monkeypatch.delenv("ANSWER_K", raising=False)
+    retr = FakeRetriever([_rc(1)])
+    _ask(_service(retr, FakeLLM(_msg(_json())))[0])
+    assert retr.requests[0].k == 10
+
+    monkeypatch.setenv("ANSWER_K", "7")
+    retr = FakeRetriever([_rc(1)])
+    _ask(_service(retr, FakeLLM(_msg(_json())))[0])
+    assert retr.requests[0].k == 7
+
+    retr = FakeRetriever([_rc(1)])  # 인자로 준 k 가 환경변수보다 우선한다
+    _ask(_service(retr, FakeLLM(_msg(_json())), k=3)[0])
+    assert retr.requests[0].k == 3
+
+
+@pytest.mark.parametrize("raw", ["", "abc", "0", "-1", "51", "1.5"])
+def test_invalid_answer_k_falls_back_to_default(monkeypatch, raw):
+    monkeypatch.setenv("ANSWER_K", raw)
+    assert answer_k() == 10
 
 
 # ── 빈 문맥 ──

@@ -152,7 +152,9 @@ export function App() {
               32px 로 그리면 선이 굵고 흐려 보여 40px 로 그리고, 물개가 숨는 좁은 화면과 머리줄 높이가 같도록 음수 여백을 둔다 */}
           <SealMascot motion="hover" isSubtle className="-my-1 size-10 shrink-0 max-md:hidden" />
           {/* 좁은 화면에서는 머리줄 자리가 모자라 화면에서만 숨긴다 (스크린 리더는 읽는다) */}
-          <h1 className="truncate text-sm font-semibold max-md:sr-only">해운 업무 Q&amp;A</h1>
+          <h1 className="truncate text-sm font-semibold max-md:sr-only">
+            부산–LA 일반 건화물 업무 지원 챗봇
+          </h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {/* 검색 방식 선택 상자는 설정으로 켤 때만 보인다. 숨기면 기본 검색 방식으로 검색한다 */}
             {SHOW_RETRIEVAL_MODE_SELECT ? (

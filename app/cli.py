@@ -2,8 +2,8 @@
 
     python -m app.cli index [--rebuild]
     python -m app.cli eval --k 5 --unit page                         # 검색 평가: 세 방식 비교
-    python -m app.cli eval-answer [--split development] [--limit N]  # 답변 평가(RAGAS + Judge): 세 방식 비교
-    python -m app.cli compare-security [--mode hybrid]               # 보안 문항을 기본·방어 프롬프트로 비교
+    python -m app.cli eval-answer [--split development] [--limit N]  # 답변 평가(RAGAS + Judge): 기본은 하이브리드+리랭킹
+    python -m app.cli compare-security [--mode hybrid_rerank]        # 보안 문항을 기본·방어 프롬프트로 비교
 
 실행하면 기본은 실제 구현으로 조립된다(`APP_IMPL=mock` 이면 목업). 평가 러너의 위치(CONTRACTS.md 5장 3번)는 팀 결정 대기 중이라
 `app/runner.py` 에 두었고, 팀이 다르게 정하면 옮긴다.
@@ -36,7 +36,10 @@ _SETTINGS = (
     "EVAL_MODEL",
     "EVAL_RAGAS_EXTRA",
     "CONTEXT_MAX_TOKENS",
+    "ANSWER_K",
 )
+# 답변 평가의 기본 검색 방식: 팀 결정(프론트도 같은 기본값). 다른 방식은 --mode 로 명시한다.
+DEFAULT_EVAL_MODE = RetrievalMode.HYBRID_RERANK
 
 
 def _progress(p: IndexProgress) -> None:
@@ -94,6 +97,20 @@ def _settings_snapshot() -> dict[str, str | None]:
     return {name: os.environ.get(name) for name in _SETTINGS} | {"CACHE_ENABLED": os.environ.get("CACHE_ENABLED")}
 
 
+def _answer_config() -> dict[str, int | str | None]:
+    """답변 생성이 실제로 쓰는 검색 개수 k 와 프롬프트 버전. 실제 백엔드가 아니면(목업) 쓰지 않으므로 None 이다.
+
+    `ANSWER_K` 환경변수 원문은 settings 에 남기고, 여기에는 서비스가 해석한 값을 남긴다(잘못된 값이면 기본값으로 돌아간 결과).
+    서비스는 인자 없이 만들어지므로 `answer_k()` 가 서비스의 k 와 같다.
+    """
+    if (os.environ.get("BACKEND_IMPL") or "").strip().lower() != "real":
+        return {"k": None, "prompt_version": None}
+    from backend.prompts import prompt_version
+    from backend.qa import answer_k
+
+    return {"k": answer_k(), "prompt_version": prompt_version()}
+
+
 def _write_report(report: dict[str, Any], out: str | None, prefix: str) -> Path:
     path = Path(out) if out else REPORT_DIR / f"{prefix}_{time.strftime('%Y%m%d_%H%M%S')}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -122,10 +139,12 @@ def cmd_eval_answer(args: argparse.Namespace) -> int:
     splits = [Split(v) for v in args.split]
     items = _limit(base.golden.load(splits), args.limit)
     golden_fp = base.golden.fingerprint(splits)
-    modes = [RetrievalMode(m) for m in args.mode] if args.mode else list(RetrievalMode)
+    modes = [RetrievalMode(m) for m in args.mode] if args.mode else [DEFAULT_EVAL_MODE]
+    config = _answer_config()
     run_id = f"eval-{time.strftime('%Y%m%d%H%M%S')}"
     print(f"index={index_name()} index_fingerprint={index_fp} golden_fingerprint={golden_fp} items={len(items)} splits={args.split}")
-    print("(캐시 끔. 검색 개수 k 는 서비스 기본값을 쓴다. 같은 설정끼리만 점수를 비교한다)")
+    print(f"k={config['k']} prompt_version={config['prompt_version']} modes={[m.value for m in modes]}")
+    print("(캐시 끔. 검색 개수 k·프롬프트 버전·검색 방식·인덱스가 같은 보고서끼리만 점수를 비교한다)")
 
     def show(mode: RetrievalMode, rep: dict[str, Any]) -> None:
         sv = rep["service"]
@@ -149,6 +168,7 @@ def cmd_eval_answer(args: argparse.Namespace) -> int:
         "golden_fingerprint": golden_fp,
         "splits": args.split,
         "item_count": len(items),
+        **config,  # k, prompt_version
         "settings": _settings_snapshot(),
         "modes": reports,
     }
@@ -181,6 +201,7 @@ def cmd_compare_security(args: argparse.Namespace) -> int:
         "index_name": index_name(),
         "index_fingerprint": index_fp,
         "golden_fingerprint": golden_fp,
+        **_answer_config(),  # k, prompt_version
         "settings": _settings_snapshot(),
         **result,
     }
@@ -202,16 +223,16 @@ def main(argv: list[str] | None = None) -> int:
     p_eval.set_defaults(func=cmd_eval)
 
     splits = [x.value for x in Split if x is not Split.SECURITY]
-    p_ans = sub.add_parser("eval-answer", help="답변 평가: RAGAS Faithfulness + Judge 네 항목 (세 방식 비교)")
+    p_ans = sub.add_parser("eval-answer", help="답변 평가: RAGAS Faithfulness + Judge 네 항목")
     p_ans.add_argument("--split", action="append", choices=splits, help="평가할 split(여러 번 가능, 기본 development)")
-    p_ans.add_argument("--mode", action="append", choices=[m.value for m in RetrievalMode], help="검색 방식(여러 번 가능, 기본 세 방식 모두)")
+    p_ans.add_argument("--mode", action="append", choices=[m.value for m in RetrievalMode], help="검색 방식(여러 번 가능, 기본 hybrid_rerank)")
     p_ans.add_argument("--limit", type=int, help="앞에서부터 N 문항만(비용 확인용)")
     p_ans.add_argument("--concurrency", type=int, default=2, help="서비스를 동시에 부르는 문항 수(기본 2)")
     p_ans.add_argument("--out", help="보고서 JSON 경로(기본 eval_reports/answer_<시각>.json)")
     p_ans.set_defaults(func=cmd_eval_answer)
 
     p_sec = sub.add_parser("compare-security", help="보안 문항을 기본·방어 프롬프트로 비교")
-    p_sec.add_argument("--mode", choices=[m.value for m in RetrievalMode], default=RetrievalMode.HYBRID.value)
+    p_sec.add_argument("--mode", choices=[m.value for m in RetrievalMode], default=DEFAULT_EVAL_MODE.value)
     p_sec.add_argument("--limit", type=int, help="앞에서부터 N 문항만(비용 확인용)")
     p_sec.add_argument("--concurrency", type=int, default=2)
     p_sec.add_argument("--out", help="보고서 JSON 경로(기본 eval_reports/security_<시각>.json)")

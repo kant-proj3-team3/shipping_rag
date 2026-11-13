@@ -1,0 +1,3233 @@
+{
+  "run": {
+    "created_at": "2026-11-11T02:19:21+00:00",
+    "k": 5,
+    "unit": "page",
+    "items_total": 60,
+    "index_name": "rag-dev-chanyeongg3",
+    "index_fingerprint": "0acd52b3e8804b0d6e07c54dfa396f2d8b01a05402f912b1ceeeca481edbe2f4",
+    "golden_fingerprint": "6fb91800a14772fdf63c158d760323b6864d8979f8f9ec1f7fbf3210cb7b1bef",
+    "embedder_id": "intfloat/multilingual-e5-base|prefix=e5|norm=l2|max=512|dim=768",
+    "chunk_count": 15053,
+    "bm25_tokenizer": "josa",
+    "torch": "2.14.1+cu130",
+    "device": "cuda",
+    "python": "3.12.13"
+  },
+  "reports": [
+    {
+      "elapsed_seconds": 0.68,
+      "report": {
+        "mode": "naive",
+        "k": 5,
+        "unit": "page",
+        "index_name": "rag-dev-chanyeongg3",
+        "index_fingerprint": "0acd52b3e8804b0d6e07c54dfa396f2d8b01a05402f912b1ceeeca481edbe2f4",
+        "golden_fingerprint": "6fb91800a14772fdf63c158d760323b6864d8979f8f9ec1f7fbf3210cb7b1bef",
+        "items": [
+          {
+            "item_id": "IS-DEV-01",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.4,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-03",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-06",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-07",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-09",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-10",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-DEV-13",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-16",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.4,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-21",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              1,
+              4
+            ]
+          },
+          {
+            "item_id": "IS-DEV-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-29",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-30",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-01",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-03",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-06",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-07",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-09",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-10",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-13",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-16",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-21",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-29",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-30",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0
+            ]
+          }
+        ],
+        "hit_at_k_mean": 0.9107142857142857,
+        "recall_at_k_mean": 0.6190901360544218,
+        "scored": 56,
+        "not_applicable": 4,
+        "unavailable": 0
+      }
+    },
+    {
+      "elapsed_seconds": 3.94,
+      "report": {
+        "mode": "hybrid",
+        "k": 5,
+        "unit": "page",
+        "index_name": "rag-dev-chanyeongg3",
+        "index_fingerprint": "0acd52b3e8804b0d6e07c54dfa396f2d8b01a05402f912b1ceeeca481edbe2f4",
+        "golden_fingerprint": "6fb91800a14772fdf63c158d760323b6864d8979f8f9ec1f7fbf3210cb7b1bef",
+        "items": [
+          {
+            "item_id": "IS-DEV-01",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.4,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-03",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-DEV-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-06",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-07",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-09",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-10",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-DEV-13",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-16",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.8,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              0,
+              1,
+              3,
+              4
+            ]
+          },
+          {
+            "item_id": "IS-DEV-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-21",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              1,
+              4
+            ]
+          },
+          {
+            "item_id": "IS-DEV-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-29",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-30",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-01",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-03",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-06",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-07",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-09",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-10",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-13",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-16",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.2,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.8333333333333334,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "item_id": "IS-ADD-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.2857142857142857,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-21",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-29",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-30",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          }
+        ],
+        "hit_at_k_mean": 0.9107142857142857,
+        "recall_at_k_mean": 0.5915391156462585,
+        "scored": 56,
+        "not_applicable": 4,
+        "unavailable": 0
+      }
+    },
+    {
+      "elapsed_seconds": 81.21,
+      "report": {
+        "mode": "hybrid_rerank",
+        "k": 5,
+        "unit": "page",
+        "index_name": "rag-dev-chanyeongg3",
+        "index_fingerprint": "0acd52b3e8804b0d6e07c54dfa396f2d8b01a05402f912b1ceeeca481edbe2f4",
+        "golden_fingerprint": "6fb91800a14772fdf63c158d760323b6864d8979f8f9ec1f7fbf3210cb7b1bef",
+        "items": [
+          {
+            "item_id": "IS-DEV-01",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.4,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-03",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-06",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-07",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-09",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-10",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-DEV-13",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-DEV-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-16",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-DEV-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              0,
+              1,
+              4
+            ]
+          },
+          {
+            "item_id": "IS-DEV-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-21",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.42857142857142855,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              1,
+              4
+            ]
+          },
+          {
+            "item_id": "IS-DEV-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.2857142857142857,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-DEV-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-29",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-DEV-30",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-01",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-02",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-03",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-04",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-05",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-06",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-07",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-08",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-09",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-10",
+            "hit": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-11",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 1,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-12",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-13",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.25,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0
+            ]
+          },
+          {
+            "item_id": "IS-ADD-14",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-15",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-16",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.2,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 5,
+            "satisfied_groups": [
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-17",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 2,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-18",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              1,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "item_id": "IS-ADD-19",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.2857142857142857,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 7,
+            "satisfied_groups": [
+              0,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-20",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-21",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-22",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-23",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.3333333333333333,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 6,
+            "satisfied_groups": [
+              0,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-24",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "item_id": "IS-ADD-25",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-26",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.75,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "item_id": "IS-ADD-27",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.6666666666666666,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-28",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 0.5,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 4,
+            "satisfied_groups": [
+              0,
+              1
+            ]
+          },
+          {
+            "item_id": "IS-ADD-29",
+            "hit": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "recall": {
+              "value": null,
+              "state": "not_applicable",
+              "reason": "근거 그룹이 없는 문항"
+            },
+            "groups_total": 0,
+            "satisfied_groups": []
+          },
+          {
+            "item_id": "IS-ADD-30",
+            "hit": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "recall": {
+              "value": 1.0,
+              "state": "scored",
+              "reason": null
+            },
+            "groups_total": 3,
+            "satisfied_groups": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "hit_at_k_mean": 0.9642857142857143,
+        "recall_at_k_mean": 0.6851190476190476,
+        "scored": 56,
+        "not_applicable": 4,
+        "unavailable": 0
+      }
+    }
+  ]
+}
